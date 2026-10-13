@@ -1,0 +1,42 @@
+
+name: CIANSE - Importar kardex desde DreamHost
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cianse-mail-import
+  cancel-in-progress: false
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Obtener codigo
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+
+      - name: Sincronizar kardex desde DreamHost
+        env:
+          DATABASE_URL: ${{ secrets.CIANSE_EXTERNAL_DATABASE_URL }}
+          MAIL_USERNAME: jesus.gutierrez@cianse.com
+          MAIL_PASSWORD: ${{ secrets.CIANSE_MAIL_PASSWORD }}
+          MAIL_IMAP_HOST: imap.dreamhost.com
+          MAIL_IMAP_PORT: '993'
+          MAIL_ALLOWED_SENDER: laura.guzman@cianse.net
+          MAIL_LOOKBACK_DAYS: '14'
+        run: python mail_sync.py
