@@ -35,3 +35,16 @@ Visita `http://localhost:8000`.
 
 ## Actualización del servicio existente (pepsico)
 Reemplaza los archivos del repositorio ya conectado a Render, conserva `DATABASE_URL` y los usuarios existentes, y despliega. No necesitas crear otra base de datos. Para comprobar que está aplicado, la aplicación debe abrir directamente el tablero después de iniciar sesión en `/login`.
+
+## Corrección de importación: STOCK 2026 PEPSICO.xlsx
+- El lector ahora busca bloques diarios en todas las hojas del archivo, aunque la única pestaña se llame `Hoja1`.
+- Detecta las filas que contienen una fecha y el rótulo `Por seleccionar`, y lee las cantidades de las dos columnas siguientes al rótulo.
+- No modifica los libros Excel originales ni la base de datos durante la instalación.
+- Se verificó el analizador con las primeras 250 filas del archivo proporcionado: 13 fechas reconocidas. **El flujo completo de subida desde Render y la conciliación de todo el libro aún necesitan probarse.**
+- Atención: el libro llamado `STOCK 2026 PEPSICO.xlsx` muestra `STOCK 2025` dentro de la hoja y una fecha inicial `02/01/2024`; verificar estos datos antes de usar el resultado para 2026.
+
+### Actualizar servicio Render existente
+1. Extraer el ZIP y subir el **contenido** de `CIANSE_KARDEX_ACCESO_UNICO/` al mismo directorio del repositorio GitHub donde están `server.py` y `requirements.txt`.
+2. Confirmar los cambios (Commit changes).
+3. Render > servicio `pepsico` > Manual Deploy > Deploy latest commit, si no se activa el automático.
+4. Probar subida del Excel en una instancia de prueba, comprobar fechas y cantidades, y confirmar persistencia tras recargar.

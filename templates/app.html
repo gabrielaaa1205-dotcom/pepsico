@@ -369,21 +369,40 @@ const KX = (() => {
 
   /* ---------- STOCK (bloques diarios) ---------- */
   function parseStock(rows) {
-    const out = []; let cur = null;
-    for (const r of rows) {
-      if (!r) continue;
-      const f = toISO(r[0]);
-      const lab = norm(r[2]);
-      if (f && lab.startsWith('POR SELECCIONAR')) { cur = { f, ps: 0, buen: 0, rech: 0, elim: 0, tg: 0, tc: 0 }; out.push(cur); }
-      if (!cur || !lab) continue;
-      const g = num(r[3]), ch = num(r[4]);
-      if (lab === 'TOTAL') { cur.tg = g; cur.tc = ch; cur = null; continue; }
+    // Excel maestro: una fila con fecha + "Por seleccionar" abre cada bloque diario.
+    // No presupone que el bloque esté siempre en A:E ni que los rótulos conserven mayúsculas.
+    const out = [];
+    let cur = null;
+    let labelCol = -1, grandCol = -1, smallCol = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] || [];
+      const labels = r.slice(0, Math.min(12, r.length)).map(norm);
+      const j = labels.findIndex(v => v.startsWith('POR SELECCIONAR'));
+      if (j >= 0) {
+        const dateCandidates = [r[0], r[1], ...r.slice(0, j)].filter(v => v != null && v !== '');
+        const f = dateCandidates.map(toISO).find(Boolean);
+        if (f) {
+          labelCol = j;
+          grandCol = j + 1;
+          smallCol = j + 2;
+          cur = { f, ps: 0, buen: 0, rech: 0, elim: 0, tg: 0, tc: 0 };
+          out.push(cur);
+        }
+      }
+      if (!cur || labelCol < 0) continue;
+      const lab = norm(r[labelCol]);
+      if (!lab) continue;
+      const g = num(r[grandCol]), ch = num(r[smallCol]);
+      if (lab === 'TOTAL' || lab.startsWith('TOTAL ')) {
+        cur.tg = g; cur.tc = ch; cur = null; continue;
+      }
       if (lab.startsWith('POR SELECCIONAR')) cur.ps += g + ch;
-      else if (lab.startsWith('BUEN ESTADO')) cur.buen += g + ch;
+      else if (lab.includes('BUEN ESTADO') || lab.includes('BUENAS')) cur.buen += g + ch;
       else if (lab.includes('RECHAZ')) cur.rech += g + ch;
-      else if (lab.includes('ELIMINAR')) cur.elim += g + ch;
+      else if (lab.includes('ELIMINAR') || lab.includes('MERMA')) cur.elim += g + ch;
     }
-    const by = {}; out.forEach(o => { by[o.f] = o; });
+    const by = {};
+    out.forEach(o => { by[o.f] = o; });
     return Object.values(by).sort((p, q) => p.f.localeCompare(q.f));
   }
 
@@ -1037,9 +1056,16 @@ async function loadFiles(files) {
         next.P = KX.parseSeleccion(rowsOf(wb.Sheets[find('SELECCION')]));
         next.meta.prod = file.name; done.push(`Producción: ${next.P.length} días de selección`);
       } else {
-        const T = KX.parseStock(rowsOf(wb.Sheets[N[0]]));
-        if (!T.length) throw new Error('no reconozco este archivo (no tiene hoja de SALIDAS, de SELECCIÓN ni bloques de stock).');
-        next.T = T; next.meta.stock = file.name; done.push(`Stock: ${T.length} días`);
+        // Algunos kardex de stock reales sólo tienen Hoja1 y pueden tener pestañas auxiliares.
+        // Buscamos bloques en todas las hojas; no suponemos que la primera sea la correcta.
+        let best = [], bestSheet = '';
+        for (const name of N) {
+          const parsed = KX.parseStock(rowsOf(wb.Sheets[name]));
+          if (parsed.length > best.length) { best = parsed; bestSheet = name; }
+        }
+        if (!best.length) throw new Error('No se reconocieron bloques diarios de stock. Revisa que haya fechas en la fila "Por seleccionar" y cantidades en las columnas siguientes.');
+        next.T = best; next.meta.stock = file.name;
+        done.push(`Stock: ${best.length} días (${bestSheet}, ${best[0].f} a ${best[best.length-1].f})`);
       }
     } catch (e) { errs.push(`${file.name}: ${e.message}`); }
   }
