@@ -48,3 +48,13 @@ Reemplaza los archivos del repositorio ya conectado a Render, conserva `DATABASE
 2. Confirmar los cambios (Commit changes).
 3. Render > servicio `pepsico` > Manual Deploy > Deploy latest commit, si no se activa el automático.
 4. Probar subida del Excel en una instancia de prueba, comprobar fechas y cantidades, y confirmar persistencia tras recargar.
+
+
+## Nuevo tablero de control diario (octubre 2026)
+- Resume el **último día con registro de selección/producción dentro del período elegido**; no lo confunde con la fecha actual.
+- Indica total de cajas trabajadas, meta diaria, cumplimiento, diferencia, buenas, rechazadas, merma y últimos siete días registrados.
+- La meta inicial sigue siendo **19,000 cajas por día**, valor ya existente en la configuración previa; confirme la meta real de la planta antes de interpretar alertas.
+- La producción se extrae del kardex de producción (DATA.P); los despachos y las cajas recibidas son indicadores distintos.
+- Centra los gráficos dentro del ancho disponible y coloca el gráfico de selección diaria en primer lugar.
+- No modifica la autenticación, los precios, los datos existentes ni el sistema de importación de stock.
+- Pruebas realizadas: comprobación de sintaxis Python y JavaScript. Pendiente: comprobación visual y operativa en el Render del cliente.

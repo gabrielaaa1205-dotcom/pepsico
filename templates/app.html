@@ -1,4 +1,39 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><style>html{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Kardex Cartones PepsiCo</title>
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><style>html{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}
+/* Panel operativo: centrado, tarjetas legibles y barras adaptables */
+.wrap{width:100%;max-width:1440px;margin-inline:auto;padding-inline:clamp(14px,3vw,38px)}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-inline:auto;align-items:start}
+.grid>.card{width:100%;min-width:0;overflow:hidden}
+.grid .chart{width:100%;max-width:100%;min-width:0;overflow:hidden}
+.grid .chart svg{max-width:100%;overflow:visible}
+.daily-panel{margin:4px 0 24px;max-width:100%;}
+.daily-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.daily-heading h2{font-size:21px}
+.daily-heading p{font-size:12px;color:var(--ink-2);margin:0}
+.daily-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.daily-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.daily-card.goal{border:2px solid var(--accent)}
+.daily-card .label{font-size:12px;color:var(--ink-2);font-weight:700}
+.daily-card .big{font:800 clamp(22px,2.8vw,35px)/1.25 var(--display);font-variant-numeric:tabular-nums;margin:6px 0}
+.daily-card .detail{color:var(--ink-2);font-size:12px}
+.daily-card .big.success{color:var(--good-ink)}
+.daily-card .big.short{color:var(--crit)}
+.goal-track{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin:12px 0 8px}
+.goal-track i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.daily-split{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.daily-split>div{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:12px;min-width:0}
+.daily-split strong{display:block;font-size:19px;font-variant-numeric:tabular-nums}
+.daily-split span{font-size:12px;color:var(--ink-2)}
+.daily-week{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:12px}
+.daily-week h3{font-size:15px;margin:0 0 10px}
+.daily-row{display:grid;grid-template-columns:92px minmax(0,1fr) 100px 65px;gap:10px;align-items:center;margin:9px 0;font-size:12px}
+.daily-row .track{background:var(--surface-2);height:13px;border-radius:4px;position:relative;overflow:hidden}
+.daily-row .fill{display:block;height:100%;background:var(--s-apta);border-radius:4px}
+.daily-row .limit{position:absolute;left:var(--goal);height:100%;width:2px;background:var(--ink);top:0}
+.daily-empty{background:var(--surface);border:1px dashed var(--line);padding:20px;border-radius:10px;color:var(--ink-2)}
+@media(max-width:1040px){.daily-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.grid{grid-template-columns:minmax(0,1fr)}.grid>.card{grid-column:auto}.daily-row{grid-template-columns:76px minmax(0,1fr) 75px 48px;gap:5px}}
+@media(max-width:510px){.daily-cards{gap:8px}.daily-card{padding:12px}.daily-card .big{font-size:24px}.daily-split{gap:6px}.daily-split>div{padding:9px}.daily-split strong{font-size:15px}.daily-row{font-size:10px}}
+</style></head><body><title>Kardex Cartones PepsiCo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -181,9 +216,18 @@ details.cfg summary{cursor:pointer;font-weight:700;font-family:var(--display);fo
     <span class="range-label" id="rangeLabel"></span>
   </nav>
 
+  <section class="daily-panel" aria-label="Resumen diario de producción">
+    <div class="daily-heading"><div><h2>Control diario de producción</h2><p id="dailyCaption">Último registro del período</p></div><span class="chip" id="dailySource">Origen: kardex de producción</span></div>
+    <div id="dailySummary" aria-live="polite"></div>
+  </section>
   <section class="kpis" id="kpis" aria-label="Indicadores"></section>
 
   <section class="grid">
+    <article class="card wide">
+      <header><h3>Selección diaria vs meta</h3>
+        <div class="legend"><span><i style="background:var(--s-apta)"></i>Buenas</span><span><i style="background:var(--s-rech)"></i>Rechazadas (pacas)</span><span><i style="background:var(--s-merma)"></i>Para eliminar</span><span><i class="line" style="background:var(--ink)"></i>Meta</span></div></header>
+      <div class="chart" id="cD"></div>
+    </article>
     <article class="card wide">
       <header><h3 id="tA">Cajas despachadas por semana</h3>
         <div class="legend"><span><i style="background:var(--s-apta)"></i>Aptas</span><span><i style="background:var(--s-rech)"></i>Rechazo</span><span><i style="background:var(--s-merma)"></i>Merma</span></div></header>
@@ -199,11 +243,7 @@ details.cfg summary{cursor:pointer;font-weight:700;font-family:var(--display);fo
       <header><h3>Aptas por tipo de caja</h3><span class="note">Barra: cajas aptas · texto: % de rechazo de ese tipo</span></header>
       <div class="chart" id="cC"></div>
     </article>
-    <article class="card">
-      <header><h3>Selección diaria vs meta</h3>
-        <div class="legend"><span><i style="background:var(--s-apta)"></i>Buenas</span><span><i style="background:var(--s-rech)"></i>Rechazadas (pacas)</span><span><i style="background:var(--s-merma)"></i>Para eliminar</span><span><i class="line" style="background:var(--ink)"></i>Meta</span></div></header>
-      <div class="chart" id="cD"></div>
-    </article>
+
     <article class="card">
       <header><h3>Stock por seleccionar</h3><span class="note">Cajas al inicio del día · zona sombreada = período elegido</span></header>
       <div class="chart" id="cE"></div>
@@ -618,6 +658,38 @@ function agg(a, b) {
   return o;
 }
 
+
+function renderDailyPanel(cur){
+  const target=$('#dailySummary');
+  // Selección diaria, no despachos: son métricas operativas distintas.
+  const days=DATA.P.filter(r=>r.f>=cur.a&&r.f<=cur.b).slice().sort((a,b)=>a.f.localeCompare(b.f));
+  const goal=Number(CFG.metaDia)||0;
+  if(!days.length){
+    $('#dailyCaption').textContent=`Del ${fDL(cur.a)} al ${fDL(cur.b)}`;
+    target.innerHTML='<div class="daily-empty">Sin registros de selección/producción para este período. Carga el kardex de producción diario para ver las metas. No se asignan valores estimados.</div>';
+    return;
+  }
+  const d=days[days.length-1], qty=d.b+d.r+d.e;
+  const ratio=goal>0?100*qty/goal:null;
+  const diff=goal>0?qty-goal:null;
+  const fmtDiff=diff===null?'Sin meta':`${diff>=0?'+':'−'}${n0(Math.abs(diff))} cajas`;
+  $('#dailyCaption').textContent=`Último día registrado: ${fDL(d.f)} · ${days.length} días con registros en el período`;
+  const card=(label,big,detail,cls='')=>`<div class="daily-card ${cls}"><div class="label">${label}</div><div class="big">${big}</div><div class="detail">${detail}</div></div>`;
+  const history=days.slice(-7);
+  const limit=Math.max(goal,...history.map(x=>x.b+x.r+x.e),1);
+  target.innerHTML=`<div class="daily-cards">
+    ${card('Cajas trabajadas',n0(qty),'Buenas + rechazadas + merma')}
+    <div class="daily-card goal"><div class="label">Cumplimiento de meta</div><div class="big ${ratio!==null?(ratio>=100?'success':'short'):''}">${ratio===null?'—':ratio.toFixed(1)+'%'}</div><div class="detail">Meta diaria: ${goal>0?n0(goal)+' cajas':'sin configurar'}</div><div class="goal-track"><i style="width:${ratio===null?0:Math.max(0,Math.min(ratio,100))}%"></i></div></div>
+    ${card('Diferencia frente a meta',fmtDiff,diff===null?'Configura una meta':diff>=0?'Meta alcanzada':'Faltan cajas para cumplir',diff===null?'':diff>=0?'goal':'')}
+    ${card('Cajas buenas',n0(d.b),qty?pct(d.b/qty)+' del total trabajado':'Sin producción')}
+  </div><div class="daily-split">
+    <div><span>Buenas</span><strong>${n0(d.b)}</strong></div><div><span>Rechazadas</span><strong>${n0(d.r)}</strong></div><div><span>Merma / para eliminar</span><strong>${n0(d.e)}</strong></div>
+  </div><div class="daily-week"><h3>Últimos ${history.length} días con producción del período</h3>
+    ${history.map(x=>{const v=x.b+x.r+x.e;const ratio=goal?v/goal*100:null;return `<div class="daily-row"><span>${fD(x.f)}</span><div class="track" style="--goal:${Math.min(goal/limit*100,100)}%"><span class="fill" style="width:${Math.min(v/limit*100,100)}%"></span>${goal?'<i class="limit"></i>':''}</div><b class="mono" style="text-align:right">${n0(v)}</b><span style="text-align:right">${ratio===null?'—':Math.round(ratio)+'%'}</span></div>`}).join('')}
+    <p class="note">Línea vertical = meta configurada. Los valores proceden del kardex de producción; no representan cajas despachadas.</p>
+  </div>`;
+}
+
 /* ================= KPIs ================= */
 function delta(cur, prev, { inverse = false, pp = false } = {}) {
   if (prev == null || !isFinite(prev) || (!pp && !prev)) return '<span class="delta flat">sin comparación</span>';
@@ -764,6 +836,7 @@ function render() {
     $('#prev').disabled = cur.idx <= 0; $('#next').disabled = cur.idx >= cur.list.length - 1;
   } else { $('#dFrom').value = cur.a; $('#dTo').value = cur.b; }
   $('#rangeLabel').textContent = `Del ${fDL(cur.a)} al ${fDL(cur.b)}`;
+  renderDailyPanel(cur);
   renderKPIs(o, prev);
 
   // Serie del año por período

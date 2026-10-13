@@ -149,5 +149,18 @@ def password_reset(user_id):
         c.execute('INSERT INTO audit(actor,operation,object_key) VALUES (%s,%s,%s)',(session['uid'],'PASSWORD_RESET',str(user_id)))
     return redirect('/admin/users')
 
+@app.route('/admin/mail-imports')
+@role_required('admin','supervisor')
+def mail_imports():
+    with db() as c:
+        if not c.execute("SELECT to_regclass('public.mail_ingestions') AS name").fetchone()['name']:
+            return '<h2>Aún no se ha ejecutado el importador de correo.</h2><p><a href="/">Volver al Kardex</a></p>'
+        rows=c.execute('SELECT processed_at,file_name,status,details FROM mail_ingestions ORDER BY id DESC LIMIT 100').fetchall()
+    from markupsafe import escape
+    colors={'review':'#a35c08','error':'#ba3333','imported':'#087d55','duplicate':'#555'}
+    tr=''.join('<tr><td>'+escape(str(r['processed_at']))+'</td><td>'+escape(r['file_name'])+'</td><td style="color:'+colors.get(r['status'],'#333')+'">'+escape(r['status'])+'</td><td>'+escape(r['details'] or '')+'</td></tr>' for r in rows)
+    return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Importaciones DreamHost</title><style>body{font:15px system-ui;margin:30px auto;max-width:1200px;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}td{overflow-wrap:anywhere}</style><h1>Importaciones DreamHost</h1><p><a href="/">← Volver al Kardex</a> · Los registros con estado review requieren conciliación; no se sobrescribieron.</p><table><tr><th>Fecha</th><th>Archivo</th><th>Estado</th><th>Detalle</th></tr>'+tr+'</table></html>'
+
+
 if __name__=='__main__':
     app.run(host='127.0.0.1',port=8000)
