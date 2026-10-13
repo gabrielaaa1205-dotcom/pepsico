@@ -12,7 +12,7 @@
 2. En https://dashboard.render.com entra en **New > Blueprint** y conecta ese repositorio (Render leerá `render.yaml`).
 3. Configura `INITIAL_ADMIN_USERNAME` con un usuario de tu elección y `INITIAL_ADMIN_PASSWORD` con una clave larga y única (mínimo 12 caracteres). No los compartas por chat ni los subas al repositorio. 
 4. Verifica y acepta el precio mostrado por Render: Blueprint solicita servicio web y PostgreSQL de pago. Entra a la URL HTTPS que genere Render.
-5. Primero inicia sesión con el usuario del **servidor**. Después introduce el usuario/clave **anterior** que desbloquea el kardex histórico cifrado. Es un paso temporal para conservar el histórico sin conocer tu clave original.
+5. Inicia sesión solo una vez con el usuario del servidor. El segundo login ha sido retirado. Si la base central está vacía, importa los kardex Excel originales desde el panel.
 6. En `/admin/users` crea las cuentas de tu personal. Consulta la guía de respaldo de PostgreSQL de Render antes de operar.
 7. Carga y revisa datos en un entorno de prueba antes de usarlo en producción. Conserva los originales aprobados.
 
@@ -21,7 +21,7 @@
 - El guardado central usa un JSON por sección (`kx-data`, `kx-cfg`, `kx-edits`). Cuando alguien importa un kardex completo, reemplaza el conjunto de datos central, sujeto a control de versión. No hay edición transaccional individual de guías todavía.
 - Si otra persona modificó una sección, la escritura falla, se advierte y se bloquean escrituras hasta recargar. No sustituye un flujo multiusuario por movimientos.
 - El rol `consulta` no puede guardar, `operario` no cambia las tarifas y `admin` administra usuarios. Aún no existe un rol diferenciado por cada transacción.
-- Las credenciales antiguas del kardex se solicitan en el navegador solo para descifrar el snapshot y no se transmiten al servidor. El desbloqueo de ese snapshot está separado de la autenticación real de Render.
+- El snapshot histórico cifrado no está incluido en esta versión porque requería la clave anterior. Los registros que ya están en PostgreSQL permanecen intactos; para recuperar registros que solo existían en el snapshot, importa los Excel originales aprobados. Conserva la versión ZIP anterior como respaldo.
 - El servidor requiere PostgreSQL y no tiene modo de producción sin base de datos.
 - Verifica las facturas de Render y configura copias de seguridad y restauración.
 
@@ -32,3 +32,6 @@
 `pip install -r requirements.txt`
 `python server.py`
 Visita `http://localhost:8000`.
+
+## Actualización del servicio existente (pepsico)
+Reemplaza los archivos del repositorio ya conectado a Render, conserva `DATABASE_URL` y los usuarios existentes, y despliega. No necesitas crear otra base de datos. Para comprobar que está aplicado, la aplicación debe abrir directamente el tablero después de iniciar sesión en `/login`.
