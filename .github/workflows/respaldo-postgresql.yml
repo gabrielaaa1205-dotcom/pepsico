@@ -25,8 +25,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/cianse-backup"
-          docker run --rm \
-            --env DATABASE_URL \
+          case "$DATABASE_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo 'CIANSE_EXTERNAL_DATABASE_URL no tiene formato de URL PostgreSQL'; exit 1 ;;
+          esac
+          docker run --rm -e DATABASE_URL="$DATABASE_URL" \
             -v "$RUNNER_TEMP/cianse-backup:/backup" \
             postgres:18 \
             bash -c 'test -n "$DATABASE_URL" || { echo "No se recibió DATABASE_URL dentro del contenedor"; exit 1; }; pg_dump --dbname="$DATABASE_URL" --format=custom --no-owner --no-acl --file=/backup/cianse.dump'
