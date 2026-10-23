@@ -147,7 +147,7 @@ def import_preview():
             category=next((("rechazadas" if "rechaz" in v.lower() else "buenas" if "buen" in v.lower() else "merma") for v in cells if any(x in v.lower() for x in ["rechaz","buenas","merma"])),None)
             dt=dates(period,year) if period else None
             amount=next((float(v) for v in row[3:6] if isinstance(v,(int,float)) and v>0),None)
-            status="rechazada" if any("rechazada" in v.lower() or "pendiente pe" in v.lower() for v in cells) else ("aprobada" if any("aprobada comercialmente" in v.lower() for v in cells) else "emitida")
+            status="rechazada" if any("rechazada - pendiente" in v.lower() or "no tiene pe" in v.lower() or "pendiente pe" in v.lower() for v in cells) else ("aprobada" if any("aprobada comercialmente" in v.lower() for v in cells) else "emitida")
             item={"sheet":name,"excel_row":index+1,"invoice":inv,"category":category,"date_from":str(dt[0]) if dt else None,"date_to":str(dt[1]) if dt else None,"amount":amount,"status":status,"period_text":period,"needs_review":not (dt and category),"year_confirmed":bool(year)}
             preview.append(item)
     return jsonify({"preview":preview,"requires_review":sum(x["needs_review"] for x in preview),"instructions":"No se guardó ningún registro. Debes confirmar años y conceptos faltantes antes de importar."})
