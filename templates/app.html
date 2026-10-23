@@ -192,7 +192,22 @@ details.cfg summary{cursor:pointer;font-weight:700;font-family:var(--display);fo
     <div class="sources"><span id="sources" style="display:contents"></span><a class="btn" href="/facturacion-kardex">Facturación y pendientes</a><button class="btn" id="logout" type="button">Cerrar sesión</button></div>
   </header>
 
-  <div class="drop" id="drop">
+  {% if cloud_role in ['admin','supervisor'] %}
+<section id="billing-exec" style="margin:18px auto;max-width:1440px;padding:16px 20px;border:1px solid #cfe2de;background:#f2faf6;border-radius:14px;color:#173b37;font:14px system-ui">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><b style="font-size:19px">Resumen financiero PepsiCo</b><div style="font-size:12px;color:#59736c">Valorización del Kardex y coincidencias preliminares con el Excel</div></div><div style="display:flex;gap:10px;align-items:center"><select id="bill-exec-month" aria-label="Mes de facturación" style="padding:8px;border:1px solid #abcfc5;border-radius:8px"></select><a href="/facturacion-kardex" style="background:#11695e;color:white;padding:10px 13px;border-radius:9px;text-decoration:none;font-weight:700">Ver detalle →</a></div></div>
+<div id="bill-exec-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0"><div>Consultando Kardex real…</div></div>
+<div style="font-size:12px;color:#73520c;background:#fff4dc;padding:9px;border-radius:7px">«Con factura asociada» no significa facturación conciliada ni pago. «Sin coincidencia» no significa deuda confirmada.</div>
+</section>
+<script>
+(()=>{const fmt=n=>'S/ '+Number(n||0).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2});const cards=document.getElementById('bill-exec-cards'),sel=document.getElementById('bill-exec-month');
+fetch('/api/facturacion-resumen',{credentials:'same-origin'}).then(r=>{if(!r.ok)throw Error('No fue posible consultar el resumen');return r.json()}).then(d=>{
+const months=d.months||[];if(!months.length){cards.textContent='No se encontraron operaciones de 2026';return}
+months.forEach(m=>{const o=document.createElement('option');o.value=m.period;o.textContent=m.period;sel.append(o)});
+function update(){const m=months.find(x=>x.period===sel.value);if(!m)return;cards.replaceChildren();[['Producción valorizada',m.estimated],['Con factura asociada · provisional',m.provisional],['Sin coincidencia en Excel',m.not_matched],['Por revisar',m.review],['Sin coincidencia / revisión +30 días',m.older_30]].forEach(([title,value])=>{const c=document.createElement('div');c.style.cssText='padding:13px;background:white;border:1px solid #d8e8e1;border-radius:10px';const t=document.createElement('div');t.style.cssText='font-size:12px;color:#526b63';t.textContent=title;const n=document.createElement('b');n.style.cssText='font-size:20px;display:block;margin-top:5px';n.textContent=fmt(value);c.append(t,n);cards.append(c)})}sel.onchange=update;update();
+}).catch(err=>{cards.textContent=err.message})})();
+</script>
+{% endif %}
+<div class="drop" id="drop">
     <p><b>Actualizar datos:</b> arrastra aquí tus Excel (kardex de ingresos y salidas, kardex de producción diario y stock) o elígelos. Se detectan automáticamente y se sincronizan con la base de datos central.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <label class="btn primary" for="file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0l-5 5m5-5l5 5M4 20h16"/></svg>Cargar Excel</label>
