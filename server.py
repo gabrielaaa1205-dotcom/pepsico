@@ -162,5 +162,8 @@ def mail_imports():
     return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Importaciones DreamHost</title><style>body{font:15px system-ui;margin:30px auto;max-width:1200px;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}td{overflow-wrap:anywhere}</style><h1>Importaciones DreamHost</h1><p><a href="/">← Volver al Kardex</a> · Los registros con estado review requieren conciliación; no se sobrescribieron.</p><table><tr><th>Fecha</th><th>Archivo</th><th>Estado</th><th>Detalle</th></tr>'+tr+'</table></html>'
 
 
+from billing_kardex_2026 import bp_billing2026
+app.register_blueprint(bp_billing2026)
+
 if __name__=='__main__':
     app.run(host='127.0.0.1',port=8000)
