@@ -120,8 +120,8 @@ def import_preview():
     months={"enero":1,"febrero":2,"marzo":3,"abril":4,"mayo":5,"junio":6,"julio":7,"agosto":8,"setiembre":9,"septiembre":9,"octubre":10,"noviembre":11,"diciembre":12,"ene":1,"feb":2,"mar":3,"abr":4,"may":5,"jun":6,"jul":7,"ago":8,"set":9,"sep":9,"oct":10,"nov":11,"dic":12}
     def dates(label,year):
         value=str(label).lower()
-        matches=re.findall(r"\\b(0?[1-9]|[12][0-9]|3[01])\\b",value)
-        mm=next((v for k,v in months.items() if re.search(r"\\b"+k+r"\\b",value)),None)
+        matches=re.findall(r"\b(0?[1-9]|[12][0-9]|3[01])\b",value)
+        mm=next((v for k,v in months.items() if re.search(r"\b"+k+r"\b",value)),None)
         if not mm or len(matches)<2 or not year:return None
         try:
             start=datetime.date(year,mm,int(matches[0]))
@@ -129,7 +129,7 @@ def import_preview():
             return start,end
         except ValueError:return None
     def normalize_invoice(v):
-        m=re.search(r"E\\s*0*0?1\\s*-?\\s*(\\d{3,7})",str(v).upper())
+        m=re.search(r"E\s*0*0?1\s*-?\s*(\d{3,7})",str(v).upper())
         return "E001-"+m.group(1) if m else None
     for sheet in wb.sheets:
         name=sheet.name
@@ -143,7 +143,7 @@ def import_preview():
             invoices=[v for v in invoices if v]
             if not invoices:continue
             inv=invoices[0]
-            period=next((v for v in cells if re.search(r"\\bdel?\\s+\\d{1,2}\\s+al\\s+\\d{1,2}",v.lower())),None)
+            period=next((v for v in cells if re.search(r"\bdel?\s+\d{1,2}\s+al\s+\d{1,2}",v.lower())),None)
             category=next((("rechazadas" if "rechaz" in v.lower() else "buenas" if "buen" in v.lower() else "merma") for v in cells if any(x in v.lower() for x in ["rechaz","buenas","merma"])),None)
             dt=dates(period,year) if period else None
             amount=next((float(v) for v in row[3:6] if isinstance(v,(int,float)) and v>0),None)
