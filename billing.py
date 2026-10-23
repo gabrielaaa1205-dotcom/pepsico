@@ -101,3 +101,53 @@ def reconciliation():
             output.append({"date":str(date),"guide":guide,"category":cat,"quantity":qty,"value":round(qty*rates[cat],2),"state":state,"invoice":accepted[0]["invoice"] if state=="facturada" else None,
               "reason":"Coincidencia provisional: validar cantidades y montos" if state=="facturada" else ("Bloques superpuestos/rechazados; revisar" if state=="revision" else "Sin bloque")})
     return jsonify({"rows":output,"disclaimer":"La coincidencia fecha/concepto es provisional. Las guías con transporte CIANSE, cantidades parciales o diferencias requieren validación; no constituye confirmación contable."})
+
+@billing.route("/api/billing/import-preview", methods=["POST"])
+def import_preview():
+    """Read-only preview: no writes; unresolved years/concepts remain for review."""
+    guard(True)
+    from io import BytesIO
+    from python_calamine import CalamineWorkbook
+    up=request.files.get("file")
+    if not up or not up.filename.lower().endswith((".xlsx",".xlsm",".xls")):
+        return jsonify(error="Adjunta un libro Excel válido"),400
+    raw=up.read(15*1024*1024+1)
+    if len(raw)>15*1024*1024:return jsonify(error="Archivo demasiado grande"),413
+    try:wb=CalamineWorkbook.from_filelike(BytesIO(raw))
+    except Exception:return jsonify(error="Excel ilegible"),400
+    preview=[];skipped=[]
+    import calendar
+    months={"enero":1,"febrero":2,"marzo":3,"abril":4,"mayo":5,"junio":6,"julio":7,"agosto":8,"setiembre":9,"septiembre":9,"octubre":10,"noviembre":11,"diciembre":12,"ene":1,"feb":2,"mar":3,"abr":4,"may":5,"jun":6,"jul":7,"ago":8,"set":9,"sep":9,"oct":10,"nov":11,"dic":12}
+    def dates(label,year):
+        value=str(label).lower()
+        matches=re.findall(r"\\b(0?[1-9]|[12][0-9]|3[01])\\b",value)
+        mm=next((v for k,v in months.items() if re.search(r"\\b"+k+r"\\b",value)),None)
+        if not mm or len(matches)<2 or not year:return None
+        try:
+            start=datetime.date(year,mm,int(matches[0]))
+            end=datetime.date(year,mm,int(matches[1]))
+            return start,end
+        except ValueError:return None
+    def normalize_invoice(v):
+        m=re.search(r"E\\s*0*0?1\\s*-?\\s*(\\d{3,7})",str(v).upper())
+        return "E001-"+m.group(1) if m else None
+    for sheet in wb.sheets:
+        name=sheet.name
+        if "pepsico" not in name.lower() or "factur" not in name.lower():continue
+        year_match=re.search(r"20(?:2[0-9])",name)
+        year=int(year_match.group()) if year_match else None
+        data=sheet.to_python()
+        for index,row in enumerate(data):
+            cells=["" if v is None else str(v).strip() for v in row]
+            invoices=[normalize_invoice(v) for v in cells]
+            invoices=[v for v in invoices if v]
+            if not invoices:continue
+            inv=invoices[0]
+            period=next((v for v in cells if re.search(r"\\bdel?\\s+\\d{1,2}\\s+al\\s+\\d{1,2}",v.lower())),None)
+            category=next((("rechazadas" if "rechaz" in v.lower() else "buenas" if "buen" in v.lower() else "merma") for v in cells if any(x in v.lower() for x in ["rechaz","buenas","merma"])),None)
+            dt=dates(period,year) if period else None
+            amount=next((float(v) for v in row[3:6] if isinstance(v,(int,float)) and v>0),None)
+            status="rechazada" if any("rechazada" in v.lower() or "pendiente pe" in v.lower() for v in cells) else ("aprobada" if any("aprobada comercialmente" in v.lower() for v in cells) else "emitida")
+            item={"sheet":name,"excel_row":index+1,"invoice":inv,"category":category,"date_from":str(dt[0]) if dt else None,"date_to":str(dt[1]) if dt else None,"amount":amount,"status":status,"period_text":period,"needs_review":not (dt and category),"year_confirmed":bool(year)}
+            preview.append(item)
+    return jsonify({"preview":preview,"requires_review":sum(x["needs_review"] for x in preview),"instructions":"No se guardó ningún registro. Debes confirmar años y conceptos faltantes antes de importar."})
