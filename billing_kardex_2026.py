@@ -80,6 +80,34 @@ def billing_report():
     rows=summary()
     return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES)
 
+@bp_billing2026.route('/api/facturacion-resumen')
+def billing_summary_api():
+    if not secure():return jsonify(error='Sesión requerida'),401
+    rows=summary()
+    months={}
+    today=datetime.date.today()
+    for row in rows:
+        month=row['date'][:7]
+        bucket=months.setdefault(month,{'period':month,'guides':set(),'estimated':0,'provisional':0,'not_matched':0,'review':0,'older_15':0,'older_30':0})
+        bucket['guides'].add(row['guide'] or row['date'])
+        v=row['estimated']
+        bucket['estimated']+=v
+        if row['status']=='asociacion_provisional':bucket['provisional']+=v
+        elif row['status']=='revisar':bucket['review']+=v
+        else:bucket['not_matched']+=v
+        if row['status']!='asociacion_provisional':
+            age=(today-datetime.date.fromisoformat(row['date'])).days
+            if age>15:bucket['older_15']+=v
+            if age>30:bucket['older_30']+=v
+    out=[]
+    for key in sorted(months,reverse=True):
+        item=months[key]
+        item['guides']=len(item['guides'])
+        for field in ['estimated','provisional','not_matched','review','older_15','older_30']:
+            item[field]=round(item[field],2)
+        out.append(item)
+    return jsonify(months=out,warning='No son saldos contables confirmados: factura vinculada solo por fecha/concepto, sin verificación de cantidades ni pagos.')
+
 @bp_billing2026.route('/api/facturacion-kardex')
 def billing_api():
     if not secure():return jsonify(error='Sesión requerida'),401
