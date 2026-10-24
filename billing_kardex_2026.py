@@ -114,7 +114,7 @@ def summary():
             elif len(matched)>1 or any((v[0],v[1],v[2]) in AMBIGUOUS for v in matched):status='revisar'
             else:status='asociacion_provisional'
             output.append({'date':d,'guide':str(guide.get('guia') or ''),'category':category,
-              'quantity':n,'estimated':round(n*rates[category],2),'status':status,
+              'quantity':n,'estimated':round(n*rates[category]*1.18,2),'net_estimated':round(n*rates[category],2),'status':status,
               'invoice':matched[0][0] if len(matched)==1 else None,
               'invoice_status':matched[0][5] if len(matched)==1 else None,
               'source_row':matched[0][6] if len(matched)==1 else None})
