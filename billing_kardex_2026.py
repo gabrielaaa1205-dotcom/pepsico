@@ -10,6 +10,7 @@ bp_billing2026=Blueprint('billing2026',__name__)
 
 # (invoice, category, inclusive period, net amount as recorded, portal status, Excel row)
 INVOICES=[
+('E001-2134','buenas','2026-01-01','2026-01-31',71005.79,'Monto confirmado por usuario; base IGV por verificar',0),
 ('E001-2191','merma','2026-01-02','2026-01-31',None,'Enviado',190),
 ('E001-2190','rechazadas','2026-01-02','2026-01-31',None,'Enviado',191),
 ('E001-2148','merma','2026-02-01','2026-02-28',6645.25,'Aprobado',192),
@@ -33,6 +34,23 @@ INVOICES=[
 ('E001-2430','buenas','2026-08-01','2026-08-31',51524.76,'Enviado',210),
 ]
 AMBIGUOUS={'E001-2148'} # Same number appears for different concepts/periods in Excel.
+
+# Historical amounts can be entered inclusive or exclusive of Peruvian IGV.
+# Until their tax basis is verified, display both interpretations rather than silently assume.
+IGV_RATE = 0.18
+def invoice_amounts(raw, basis='por_verificar'):
+    from decimal import Decimal, ROUND_HALF_UP
+    if raw is None:
+        return {'basis': 'sin_monto', 'raw': None, 'net': None, 'igv': None, 'gross': None, 'if_net_gross': None, 'if_gross_net': None}
+    amount = Decimal(str(raw))
+    round2 = lambda x: float(x.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+    if basis == 'sin_igv':
+        net = amount; gross = net * Decimal('1.18')
+    elif basis == 'con_igv':
+        gross = amount; net = gross / Decimal('1.18')
+    else:
+        return {'basis': 'por_verificar', 'raw': round2(amount), 'net': None, 'igv': None, 'gross': None, 'if_net_gross': round2(amount * Decimal('1.18')), 'if_gross_net': round2(amount / Decimal('1.18'))}
+    return {'basis':basis,'raw':round2(amount),'net':round2(net),'igv':round2(gross-net),'gross':round2(gross),'if_net_gross':None,'if_gross_net':None}
 
 def secure():
     return bool(session.get('uid'))
@@ -112,3 +130,14 @@ def billing_summary_api():
 def billing_api():
     if not secure():return jsonify(error='Sesión requerida'),401
     return jsonify({'rows':summary(),'note':'Coincidencia por concepto y fecha, NO conciliación definitiva de cantidad/factura/pago. Ausencia en Excel no prueba falta de emisión.'})
+
+@bp_billing2026.route('/api/facturacion-bloques')
+def billing_blocks():
+    if not secure():return jsonify(error='Sesión requerida'),401
+    blocks=[]
+    for inv in INVOICES:
+        number,category,frm,to,amount,status,row=inv
+        blocks.append({'invoice':number,'concept':category,'from':frm,'to':to,'status':status,
+                       'amount':invoice_amounts(amount),'source_row':row,
+                       'review':'Monto con/sin IGV sin verificar; conciliar con comprobante'})
+    return jsonify(blocks=blocks,igv_rate=IGV_RATE)
