@@ -96,7 +96,8 @@ def summary():
 def billing_report():
     if not secure():return redirect('/login')
     rows=summary()
-    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES)
+    estimated_amounts = { (v[0],v[1],v[2]): round(sum(r['estimated'] for r in rows if r['category']==v[1] and v[2]<=r['date']<=v[3]),2) for v in INVOICES }
+    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES,estimated_amounts=estimated_amounts)
 
 @bp_billing2026.route('/api/facturacion-resumen')
 def billing_summary_api():
