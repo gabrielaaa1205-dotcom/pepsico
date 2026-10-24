@@ -10,7 +10,7 @@ bp_billing2026=Blueprint('billing2026',__name__)
 
 # (invoice, category, inclusive period, net amount as recorded, portal status, Excel row)
 INVOICES=[
-('E001-2134','buenas','2026-01-01','2026-01-31',71005.79,'Monto confirmado por usuario; base IGV por verificar',0),
+('E001-2134','buenas','2025-12-23','2026-01-31',71005.79,'Aprobado · IGV por verificar',189),
 ('E001-2191','merma','2026-01-02','2026-01-31',None,'Enviado',190),
 ('E001-2190','rechazadas','2026-01-02','2026-01-31',None,'Enviado',191),
 ('E001-2148','merma','2026-02-01','2026-02-28',6645.25,'Aprobado',192),
@@ -33,7 +33,7 @@ INVOICES=[
 ('E001-2431','rechazadas','2026-07-01','2026-07-31',6118.11,'Enviado',209),
 ('E001-2430','buenas','2026-08-01','2026-08-31',51524.76,'Enviado',210),
 ]
-AMBIGUOUS={'E001-2148'} # Same number appears for different concepts/periods in Excel.
+AMBIGUOUS={('E001-2148','buenas','2026-03-01')} # Only March duplicate is unresolved; Feb merma is documented.
 
 # Historical amounts can be entered inclusive or exclusive of Peruvian IGV.
 # Until their tax basis is verified, display both interpretations rather than silently assume.
@@ -83,7 +83,7 @@ def summary():
             if n<=0:continue
             matched=[v for v in INVOICES if v[1]==category and v[2]<=d<=v[3]]
             if not matched:status='sin_coincidencia'
-            elif len(matched)>1 or any(v[0] in AMBIGUOUS for v in matched):status='revisar'
+            elif len(matched)>1 or any((v[0],v[1],v[2]) in AMBIGUOUS for v in matched):status='revisar'
             else:status='asociacion_provisional'
             output.append({'date':d,'guide':str(guide.get('guia') or ''),'category':category,
               'quantity':n,'estimated':round(n*rates[category],2),'status':status,
