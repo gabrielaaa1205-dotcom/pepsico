@@ -52,6 +52,34 @@ def invoice_amounts(raw, basis='por_verificar'):
         return {'basis': 'por_verificar', 'raw': round2(amount), 'net': None, 'igv': None, 'gross': None, 'if_net_gross': round2(amount * Decimal('1.18')), 'if_gross_net': round2(amount / Decimal('1.18'))}
     return {'basis':basis,'raw':round2(amount),'net':round2(net),'igv':round2(gross-net),'gross':round2(gross),'if_net_gross':None,'if_gross_net':None}
 
+
+def tax_reconciliation(rows):
+    """Evidence-based tax classification; preserve unresolved mismatches."""
+    from decimal import Decimal, ROUND_HALF_UP
+    round2=lambda n: n.quantize(Decimal('0.01'),rounding=ROUND_HALF_UP)
+    result={}
+    for number,concept,start,end,raw,state,excel_row in INVOICES:
+        items=[r for r in rows if r['category']==concept and start<=r['date']<=end]
+        net=round2(sum((Decimal(str(r['quantity']))*Decimal(str({'buenas':0.143,'rechazadas':0.093,'merma':0.070}[concept])) for r in items),Decimal('0')))
+        gross=round2(net*Decimal('1.18'))
+        basis='sin_monto' if raw is None else 'diferencia_por_conciliar'
+        delta=None
+        if raw is not None and start>='2026-01-01':
+            supplied=Decimal(str(raw))
+            difference_net=abs(supplied-net)
+            difference_gross=abs(supplied-gross)
+            delta=round2(min(difference_net,difference_gross))
+            if delta<=Decimal('1.00'):
+                basis='sin_igv' if difference_net<=difference_gross else 'con_igv'
+        if start<'2026-01-01':
+            basis='historial_parcial'
+        result[number+'|'+concept+'|'+start]={
+            'basis':basis,'kardex_net':float(net),'kardex_igv':float(gross-net),
+            'kardex_gross':float(gross),'difference':float(delta) if delta is not None else None,
+            'guide_count':len(set(r['guide'] or r['date'] for r in items))
+        }
+    return result
+
 def secure():
     return bool(session.get('uid'))
 
@@ -97,7 +125,7 @@ def billing_report():
     if not secure():return redirect('/login')
     rows=summary()
     estimated_amounts = { (v[0]+'|'+v[1]+'|'+v[2]): round(sum(r['estimated'] for r in rows if r['category']==v[1] and v[2]<=r['date']<=v[3]),2) for v in INVOICES }
-    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES,estimated_amounts=estimated_amounts)
+    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES,estimated_amounts=estimated_amounts,tax_reconciliations=tax_reconciliation(rows))
 
 @bp_billing2026.route('/api/facturacion-resumen')
 def billing_summary_api():
