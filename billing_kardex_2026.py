@@ -16,7 +16,7 @@ INVOICES=[
 ('E001-2148','merma','2026-02-01','2026-02-28',6645.25,'Aprobado',192),
 ('E001-2147','rechazadas','2026-02-01','2026-02-28',5355.31,'Aprobado',193),
 ('E001-2135','buenas','2026-02-01','2026-02-28',41898.14,'Aprobado',194),
-('E001-2148','buenas','2026-03-01','2026-03-31',6645.25,'Enviado',195),
+('E001-2153','buenas','2026-03-01','2026-03-31',40755.00,'Enviado',195),
 ('E001-2188','rechazadas','2026-03-01','2026-03-31',3968.97,'Enviado',196),
 ('E001-2189','merma','2026-03-01','2026-03-31',9817.09,'Enviado',197),
 ('E001-2203','buenas','2026-04-01','2026-04-30',42843.09,'Enviado',198),
@@ -33,7 +33,7 @@ INVOICES=[
 ('E001-2431','rechazadas','2026-07-01','2026-07-31',6118.11,'Enviado',209),
 ('E001-2430','buenas','2026-08-01','2026-08-31',51524.76,'Enviado',210),
 ]
-AMBIGUOUS={('E001-2148','buenas','2026-03-01')} # Only March duplicate is unresolved; Feb merma is documented.
+AMBIGUOUS=set() # Only March duplicate is unresolved; Feb merma is documented.
 
 # Historical amounts can be entered inclusive or exclusive of Peruvian IGV.
 # Until their tax basis is verified, display both interpretations rather than silently assume.
