@@ -199,7 +199,10 @@ def invoices():
         groups.setdefault(r['invoice'],{'events':{},'pdfs':[]})['pdfs'].append({'id':r['id'],'filename':r['filename']})
     with database() as c:
         imported=c.execute("SELECT count(*) AS n FROM egrid_pdf WHERE mailbox='outlook_import'").fetchone()['n']
-    return jsonify(invoices=groups,imported_pdf_count=imported)
+    with database() as c:
+        reports=c.execute("SELECT category,subject,sent_at,filename FROM egrid_kardex_sent ORDER BY sent_at DESC NULLS LAST,id DESC LIMIT 100").fetchall()
+    cards=[dict(category=r['category'],subject=r['subject'],sent_at=r['sent_at'].isoformat() if r['sent_at'] else None,filename=r['filename']) for r in reports]
+    return jsonify(invoices=groups,imported_pdf_count=imported,kardex_reports=cards)
 @bp_mail.route('/api/egrid/pdf/<int:pdf_id>')
 def pdf(pdf_id):
     authorized()
