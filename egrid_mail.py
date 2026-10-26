@@ -90,13 +90,16 @@ def sync():
                 sent=next((line.rsplit('"',2)[1] for line in folders_text if ('\\Sent' in line or 'sent' in line.lower() or 'enviad' in line.lower()) and line.count('"')>=2),None)
             # Prefer the selectable folder actually containing mail to the confirmed recipient.
             # DreamHost may expose several independent folders named Sent/Sent Items.
-            available=[]
-            for line in folders_text:
-                match=re.search(r' "([^"]+)"\\s*
+            # POP3 sent messages may be unavailable on DreamHost; scan Inbox regardless.
+            for alias,folder in [('sent',sent),('inbox','INBOX')]:
                 if not folder:
-                    warnings.append('No se encontró carpeta Enviados');scan_info[alias]={'error':'carpeta_no_encontrada','available_folders':folders_text};continue
+                    warnings.append('No se encontró carpeta Enviados')
+                    scan_info[alias]={'error':'carpeta_no_encontrada'}
+                    continue
                 if imap.select('"'+folder.replace('"','')+'"',readonly=True)[0]!='OK':
-                    warnings.append('No se pudo abrir '+folder);scan_info[alias]={'error':'carpeta_no_accesible','folder':folder};continue
+                    warnings.append('No se pudo abrir '+folder)
+                    scan_info[alias]={'error':'carpeta_no_accesible','folder':folder}
+                    continue
                 since=(datetime.date.today()-datetime.timedelta(days=390)).strftime('%d-%b-%Y')
                 typ,ids=imap.search(None,'SINCE',since)
                 if typ!='OK':warnings.append('Búsqueda IMAP fallida: '+alias);continue
