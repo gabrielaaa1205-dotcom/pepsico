@@ -26,8 +26,8 @@
     button.disabled=true;status.textContent='Leyendo correo de DreamHost…';
     try{
       const r=await fetch('/api/egrid/sync',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''}});
-      const d=await r.json();if(!r.ok)throw Error(d.error||'Error de sincronización');
-      status.textContent='Evidencias nuevas: '+d.new_events+' · PDF nuevos: '+d.new_pdfs+' '+(d.warnings||[]).join('; ');
+      const responseText=await r.text();let d;try{d=JSON.parse(responseText)}catch(_){throw Error('El servidor interrumpió la sincronización. Intenta nuevamente; los lotes procesados se conservan.')}if(!r.ok)throw Error(d.error||'Error de sincronización');
+      status.textContent='Lote terminado · evidencias nuevas: '+d.new_events+' · PDF nuevos: '+d.new_pdfs+' · Pulsa nuevamente para continuar con correos antiguos. '+(d.warnings||[]).join('; ');
       await load();
     }catch(e){status.textContent=e.message}finally{button.disabled=false}
   };
