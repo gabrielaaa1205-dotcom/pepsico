@@ -25,7 +25,7 @@
   let syncing=false;
   async function syncBatches(maxBatches=6){
     if(syncing)return;syncing=true;button.disabled=true;
-    let totalEvents=0,totalPdfs=0;
+    let totalEvents=0,totalPdfs=0;let scanDetails='';
     try{
       for(let step=0;step<maxBatches;step++){
         status.textContent='Buscando facturas en DreamHost · lote '+(step+1)+' de '+maxBatches+'…';
@@ -33,11 +33,11 @@
         const body=await r.text();let d;
         try{d=JSON.parse(body)}catch(_){if(r.status===401||r.status===403)throw Error('Tu sesión expiró. Inicia sesión otra vez y vuelve al panel.');throw Error('El servidor devolvió una página en vez de datos. Consulta el panel o vuelve a iniciar sesión.')}
         if(r.status===401||r.status===403)throw Error('Tu sesión expiró. Vuelve a iniciar sesión en CIANSE PRO para sincronizar el correo.');if(!r.ok)throw Error(d.error||'Error de sincronización');
-        totalEvents+=d.new_events||0;totalPdfs+=d.new_pdfs||0;
+        totalEvents+=d.new_events||0;totalPdfs+=d.new_pdfs||0;scanDetails=Object.entries(d.scan||{}).map(([name,v])=>name+': '+(v.error||((v.processed_before||0)+(v.this_batch||0))+'/'+(v.matched||0)+' correos')).join(' · ');if((d.warnings||[]).length)scanDetails+=' · '+d.warnings.join('; ');
         await load();
         if(d.complete)break;
       }
-      status.textContent='Búsqueda realizada · '+totalEvents+' evidencias y '+totalPdfs+' PDF nuevos. Puedes repetirla para ampliar el historial.';
+      status.textContent='Búsqueda realizada · '+totalEvents+' evidencias y '+totalPdfs+' PDF nuevos. '+scanDetails;
     }catch(e){status.textContent='Sincronización incompleta: '+e.message}
     finally{syncing=false;button.disabled=false}
   }
