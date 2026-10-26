@@ -54,7 +54,7 @@ def email_text(msg):
 def classify(mailbox,sender,recipient,subject,body):
     sender=sender.lower();recipient=recipient.lower()
     if mailbox=='sent':
-        if 'e-grid.app' in recipient:return 'enviado'
+        if 'e-grid.app' in recipient or 'e-grid.app' in (subject+' '+body[:600]).lower():return 'enviado'
         return None
     if 'noreply@e-grid.app' not in sender:return None
     t=(subject+' '+body[:5000]).lower()
@@ -93,7 +93,7 @@ def sync():
                 if imap.select('"'+folder.replace('"','')+'"',readonly=True)[0]!='OK':
                     warnings.append('No se pudo abrir '+folder);scan_info[alias]={'error':'carpeta_no_accesible','folder':folder};continue
                 since=(datetime.date.today()-datetime.timedelta(days=390)).strftime('%d-%b-%Y')
-                typ,ids=imap.search(None,'SINCE',since,'FROM' if alias=='received' else 'TO','noreply@e-grid.app' if alias=='received' else 'e-grid.app')
+                typ,ids=imap.search(None,'SINCE',since)
                 if typ!='OK':warnings.append('Búsqueda IMAP fallida: '+alias);continue
                 uids=ids[0].split() if ids and ids[0] else []
                 with database() as c:
@@ -101,7 +101,7 @@ def sync():
                     row=c.execute('SELECT processed FROM egrid_scan_cursor WHERE folder=%s',(alias,)).fetchone()
                     offset=row['processed'] if row else 0
                 uids=list(reversed(uids))
-                batch=uids[offset:offset+18]
+                batch=uids[offset:offset+12]
                 scan_info[alias]={'folder':folder,'matched':len(uids),'processed_before':offset,'this_batch':len(batch)}
                 for mid in batch:
                     typ,parts=imap.fetch(mid,'(RFC822)')
