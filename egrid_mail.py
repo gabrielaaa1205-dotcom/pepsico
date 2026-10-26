@@ -110,7 +110,7 @@ def sync():
                     warnings.append('No se pudo abrir '+folder)
                     scan_info[alias]={'error':'carpeta_no_accesible','folder':folder}
                     continue
-                since=(datetime.date.today()-datetime.timedelta(days=390)).strftime('%d-%b-%Y')
+                since=(datetime.date.today()-datetime.timedelta(days=14 if alias=='inbox' else 390)).strftime('%d-%b-%Y')
                 typ,ids=imap.search(None,'SINCE',since)
                 if typ!='OK':warnings.append('Búsqueda IMAP fallida: '+alias);continue
                 uids=ids[0].split() if ids and ids[0] else []
@@ -119,7 +119,8 @@ def sync():
                     row=c.execute('SELECT processed FROM egrid_scan_cursor WHERE folder=%s',(alias+'-full-search-v2',)).fetchone()
                     offset=row['processed'] if row else 0
                 uids=list(reversed(uids))
-                batch=uids[offset:offset+12]
+                if alias=='inbox':offset=0  # Always revisit the most recent incoming reports; cursor must not skip new messages.
+                batch=uids[offset:offset+(40 if alias=='inbox' else 12)]
                 scan_info[alias]={'folder':folder,'matched':len(uids),'processed_before':offset,'this_batch':len(batch)}
                 for mid in batch:
                     typ,parts=imap.fetch(mid,'(RFC822)')
