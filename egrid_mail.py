@@ -286,3 +286,53 @@ def import_pdf_zip():
                 if inserted:added+=1;invoices.append(inv)
     return jsonify(ok=True,new_pdfs=added,invoices=invoices,skipped=skipped,
       note='PDF importado desde el ZIP de Outlook. El PDF por sí solo no prueba aprobación ni recepción.')
+
+@bp_mail.route('/api/egrid/import-outlook-msg',methods=['POST'])
+def import_outlook_msg():
+    """Import original sent Outlook .msg files as evidence, separate from PDF imports."""
+    authorized()
+    from server import check_csrf
+    import zipfile,hashlib,extract_msg
+    check_csrf()
+    uploaded=request.files.get('file')
+    if not uploaded:return jsonify(error='Selecciona el ZIP original con correos .msg'),400
+    blob=uploaded.read(14*1024*1024+1)
+    if len(blob)>14*1024*1024:return jsonify(error='ZIP demasiado grande'),413
+    if not zipfile.is_zipfile(io.BytesIO(blob)):return jsonify(error='ZIP inválido'),400
+    added=0;skipped=[];invoices_seen=[]
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        if len(z.infolist())>150:return jsonify(error='Demasiados archivos'),400
+        for entry in z.infolist():
+            name=os.path.basename(entry.filename)
+            if not name.lower().endswith('.msg') or entry.file_size>5*1024*1024 or entry.is_dir():continue
+            try:
+                original=z.read(entry)
+                msg=extract_msg.Message(io.BytesIO(original))
+                subject=str(msg.subject or '')
+                sender=str(msg.sender or '')
+                recipient=str(msg.to or '')
+                date=str(msg.date or '')
+                numbers=number_candidates(subject+' '+name)
+                try:dt=parsedate_to_datetime(date) if date else None
+                except (ValueError,TypeError,OverflowError):dt=None
+                # User-uploaded MSG metadata is treated as a claim of sending,
+                # not as verified remote-server delivery or approval.
+                if not numbers or 'compras@e-grid.app' not in recipient.lower():
+                    skipped.append(name);continue
+                uid='msg-'+hashlib.sha256(original).hexdigest()
+                with database() as c:
+                    ensure_tables(c)
+                    for invoice in numbers:
+                        inserted=c.execute("""INSERT INTO egrid_mail
+                           (mailbox,uid,message_id,invoice,sender,recipient,subject,sent_at,evidence_type,excerpt)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                           ON CONFLICT DO NOTHING RETURNING id""",
+                           ('outlook_msg_import',uid,None,invoice,sender[:350],recipient[:600],
+                            subject[:900],dt,'enviado','Importado desde mensaje Outlook .msg; entrega sin verificar')).fetchone()
+                        if inserted:added+=1;invoices_seen.append(invoice)
+                msg.close()
+            except Exception:
+                skipped.append(name)
+    return jsonify(ok=True,added=added,skipped=skipped,invoices=sorted(set(invoices_seen)),
+        note='Registro de envío basado en mensajes Outlook importados; no confirma recepción ni aprobación.')
+
