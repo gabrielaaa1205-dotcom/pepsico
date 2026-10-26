@@ -179,3 +179,37 @@ def pdf(pdf_id):
     response=send_file(io.BytesIO(bytes(record['content'])),mimetype='application/pdf',download_name=filename,as_attachment=False)
     response.headers['Cache-Control']='private, no-store'
     return response
+
+
+@bp_mail.route('/api/egrid/folder-diagnostics')
+def folder_diagnostics():
+    authorized()
+    password,user=imap_creds()
+    if not password:return jsonify(error='IMAP no configurado'),503
+    result=[]
+    try:
+        conn=imaplib.IMAP4_SSL(os.getenv('DREAMHOST_IMAP_HOST','imap.dreamhost.com'),993,timeout=12)
+        try:
+            conn.login(user,password)
+            status,folders=conn.list()
+            for entry in (folders or []):
+                raw=entry.decode('utf-8',errors='replace')
+                # Folder name is the last quoted token, or last unquoted word.
+                match=re.search(r' "([^"]+)"\s*$',raw)
+                name=match.group(1) if match else raw.split(' ')[-1].strip('"')
+                if not name:continue
+                row={'folder':name,'all':None,'to_compras':None}
+                try:
+                    if conn.select('"'+name.replace('"','')+'"',readonly=True)[0]=='OK':
+                        a,all_ids=conn.search(None,'ALL')
+                        b,sent_ids=conn.search(None,'TO','compras@e-grid.app')
+                        if a=='OK':row['all']=len(all_ids[0].split()) if all_ids and all_ids[0] else 0
+                        if b=='OK':row['to_compras']=len(sent_ids[0].split()) if sent_ids and sent_ids[0] else 0
+                except Exception:row['error']='No accesible'
+                result.append(row)
+        finally:
+            try:conn.logout()
+            except Exception:pass
+    except Exception as exc:
+        return jsonify(error='No se pudo consultar IMAP',kind=type(exc).__name__),502
+    return jsonify(folders=result)
