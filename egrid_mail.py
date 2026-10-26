@@ -175,7 +175,9 @@ def invoices():
                             'subject':r['subject'],'sender':r['sender'],'evidence_id':r['id']}
     for r in docs:
         groups.setdefault(r['invoice'],{'events':{},'pdfs':[]})['pdfs'].append({'id':r['id'],'filename':r['filename']})
-    return jsonify(invoices=groups)
+    with database() as c:
+        imported=c.execute("SELECT count(*) AS n FROM egrid_pdf WHERE mailbox='outlook_import'").fetchone()['n']
+    return jsonify(invoices=groups,imported_pdf_count=imported)
 @bp_mail.route('/api/egrid/pdf/<int:pdf_id>')
 def pdf(pdf_id):
     authorized()
