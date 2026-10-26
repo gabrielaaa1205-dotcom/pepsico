@@ -126,6 +126,23 @@ def sync():
                     body=email_text(msg)
                     state=classify(alias,sender,recipient,subject,body)
                     if not state:continue
+                    if state=='enviado':
+                        filenames=[decode(p.get_filename()) for p in msg.walk() if p.get_filename()]
+                        descriptor=(subject+' '+' '.join(filenames)).lower()
+                        concepts=[]
+                        if 'merma' in descriptor:concepts.append('merma')
+                        if re.search(r'rechazad[ao]s?',descriptor):concepts.append('rechazadas')
+                        if concepts:
+                            try:kdate=parsedate_to_datetime(msg.get('Date'))
+                            except:kdate=None
+                            with database() as c:
+                                ensure_tables(c)
+                                for concept in concepts:
+                                    c.execute("""INSERT INTO egrid_kardex_sent
+                                        (mailbox,uid,category,subject,sent_at,filename)
+                                        VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
+                                        (alias,mid.decode(),concept,subject[:900],kdate,
+                                         ', '.join(filenames)[:600]))
                     candidates=number_candidates(subject+' '+body[:9000])
                     pdfs=[]
                     for p in msg.walk():
