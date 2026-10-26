@@ -54,7 +54,7 @@ def email_text(msg):
 def classify(mailbox,sender,recipient,subject,body):
     sender=sender.lower();recipient=recipient.lower()
     if mailbox=='sent':
-        if 'e-grid.app' in recipient or 'e-grid.app' in (subject+' '+body[:600]).lower():return 'enviado'
+        if 'compras@e-grid.app' in recipient.lower():return 'enviado'
         return None
     if 'noreply@e-grid.app' not in sender:return None
     t=(subject+' '+body[:5000]).lower()
