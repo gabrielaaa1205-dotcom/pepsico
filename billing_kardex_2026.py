@@ -86,6 +86,22 @@ def tax_reconciliation(rows):
                     'note':'Comprobante verificado: 36,167 cajas a S/ 0.093, total S/ 3,968.97 con IGV. Revisar las guías y el período.'
                 }
                 continue
+            if number=='E001-2354':
+                # Verified invoice E001-2354 and OC 4523953131 agree in full:
+                # 93,551 units; S/ 6,548.57 net; S/ 7,727.31 gross.
+                # Do not conflate this verified documentary match with Kardex
+                # June's provisional date-based association (76,290 units).
+                result[number+'|'+concept+'|'+start]={
+                    'basis':'factura_oc_coinciden',
+                    'kardex_net':float(net),'kardex_igv':float(gross-net),
+                    'kardex_gross':float(gross),'difference':0.0,
+                    'guide_count':len(set(r['guide'] or r['date'] for r in items)),
+                    'invoice_gross':7727.31,'invoice_net':6548.57,
+                    'invoice_quantity':93551,'oc':'4523953131',
+                    'support_quantity':93550,'support_guide_count':14,
+                    'note':'OC y factura coinciden (S/ 7,727.31). Excel soporte: 14 guias, 93,550 cajas; diferencia documental de 1 caja. Kardex del mes por fecha: asociacion pendiente; no borrar ni reasignar guias.'
+                }
+                continue
             difference_net=abs(supplied-net)
             difference_gross=abs(supplied-gross)
             delta=round2(min(difference_net,difference_gross))
