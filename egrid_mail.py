@@ -59,8 +59,9 @@ def email_text(msg):
 def classify(mailbox,sender,recipient,subject,body):
     sender=sender.lower();recipient=recipient.lower()
     if mailbox=='sent':
-        if 'compras@e-grid.app' in recipient.lower():return 'enviado'
-        return None
+        # Sent Kardex reports may be addressed to PepsiCo colleagues rather than e-grid.
+        # Only reports matching Kardex concepts are persisted separately.
+        return 'enviado'
     if 'gabriela.diaz@cianse.com' in sender and 'compras@e-grid.app' in recipient:return 'enviado'
     if 'noreply@e-grid.app' not in sender:return None
     t=(subject+' '+body[:5000]).lower()
