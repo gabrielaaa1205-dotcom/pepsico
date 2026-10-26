@@ -6,6 +6,20 @@
   importBox.style.cssText='margin:12px 0;padding:13px;background:#f1f8f5;border-radius:10px';
   importBox.innerHTML='<strong>Importar facturas históricas de Outlook</strong><p class="muted">Selecciona el ZIP preparado con las facturas PDF.</p><input id="egrid-zip" type="file" accept=".zip,application/zip" style="max-width:100%;margin-right:8px"><button type="button" class="btn" id="egrid-import">Importar PDF al Kardex</button><p class="muted" id="egrid-import-status"></p>';
   panel.insertBefore(importBox,panel.querySelector('#egrid-evidence'));
+  const reopen=document.createElement('button');
+  reopen.type='button';reopen.className='btn ghost';reopen.textContent='Importar más facturas';
+  reopen.style.cssText='display:none;margin:8px 0';
+  panel.insertBefore(reopen,importBox);
+  reopen.onclick=()=>{importBox.style.display='block';reopen.style.display='none';};
+  const completeImport=()=>{importBox.style.display='none';reopen.style.display='inline-block';};
+  const evidenceTarget=panel.querySelector('#egrid-evidence');
+  const archive=document.createElement('details');
+  archive.style.cssText='margin-top:12px';
+  const archiveTitle=document.createElement('summary');
+  archiveTitle.textContent='Ver historial de correos y facturas importadas';
+  archiveTitle.style.cssText='cursor:pointer;color:#146a5c;font-weight:700;padding:10px 0';
+  evidenceTarget.parentNode.insertBefore(archive,evidenceTarget);
+  archive.append(archiveTitle,evidenceTarget);
   importBox.querySelector('#egrid-import').onclick=async()=>{
     const file=importBox.querySelector('#egrid-zip').files?.[0],out=importBox.querySelector('#egrid-import-status');
     if(!file){out.textContent='Selecciona un ZIP primero.';return}
@@ -16,6 +30,7 @@
       const d=await r.json();if(!r.ok)throw Error(d.error||'Error al importar');
       out.textContent='Importación terminada: '+d.new_pdfs+' facturas PDF nuevas. '+(d.skipped?.length?'No procesadas: '+d.skipped.join(', '):'');
       await load();
+      if(d.new_pdfs>0 || d.already_imported)completeImport();
     }catch(e){out.textContent='Error: '+e.message}
     finally{btn.disabled=false}
   };
@@ -24,7 +39,7 @@
   const target=panel.querySelector('#egrid-evidence');
   async function load(){
     const r=await fetch('/api/egrid/invoices');if(!r.ok)throw Error('No se puede leer el seguimiento de e-grid');
-    const d=await r.json();target.replaceChildren();
+    const d=await r.json();if((d.imported_pdf_count||0)>0)completeImport();target.replaceChildren();
     for(const [invoice,obj] of Object.entries(d.invoices||{})){
       const card=document.createElement('details');card.style.cssText='padding:12px;margin:8px 0;background:#f4f9f7;border:1px solid #daeae3;border-radius:8px';
       const head=document.createElement('summary');head.textContent='Factura '+invoice+' · evidencias y PDF';card.append(head);
