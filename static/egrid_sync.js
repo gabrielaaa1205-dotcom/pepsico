@@ -40,6 +40,21 @@
   async function load(){
     const r=await fetch('/api/egrid/invoices');if(!r.ok)throw Error('No se puede leer el seguimiento de e-grid');
     const d=await r.json();if((d.imported_pdf_count||0)>0)completeImport();target.replaceChildren();
+    const existing=panel.querySelector('#egrid-kardex-cards');if(existing)existing.remove();
+    const reportsSection=document.createElement('section');reportsSection.id='egrid-kardex-cards';
+    reportsSection.style.cssText='margin:12px 0 16px';
+    const title=document.createElement('h3');title.textContent='Kardex enviados a PepsiCo';reportsSection.append(title);
+    const reports=d.kardex_reports||[];
+    if(!reports.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='No se han localizado correos enviados de Kardex en el buzón IMAP conectado. Los mensajes guardados solo en Outlook de la laptop no se pueden leer desde aquí.';reportsSection.append(empty)}
+    for(const item of reports){
+      const card=document.createElement('article');card.style.cssText='background:#f4f9f7;border:1px solid #daeae3;border-radius:10px;padding:13px;margin:8px 0';
+      const heading=document.createElement('strong');heading.textContent=item.category==='merma'?'Kardex de merma':item.category==='rechazadas'?'Kardex de cajas rechazadas':'Kardex de '+item.category;card.append(heading);
+      const timestamp=document.createElement('p');timestamp.textContent='Enviado: '+(item.sent_at?new Date(item.sent_at).toLocaleString('es-PE'):'Fecha no disponible')+' · Correo detectado (no implica aprobación)';card.append(timestamp);
+      const subject=document.createElement('p');subject.textContent='Asunto: '+(item.subject||'Sin asunto');card.append(subject);
+      if(item.filename){const attachment=document.createElement('p');attachment.textContent='Adjunto: '+item.filename;card.append(attachment)}
+      reportsSection.append(card);
+    }
+    panel.insertBefore(reportsSection,archive);
     for(const [invoice,obj] of Object.entries(d.invoices||{})){
       const card=document.createElement('details');card.style.cssText='padding:12px;margin:8px 0;background:#f4f9f7;border:1px solid #daeae3;border-radius:8px';
       const head=document.createElement('summary');head.textContent='Factura '+invoice+' · evidencias y PDF';card.append(head);
