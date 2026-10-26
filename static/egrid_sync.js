@@ -33,7 +33,7 @@
   };
   try{
     const r=await fetch('/api/egrid/status');if(!r.ok)throw Error('Acceso permitido solo a administradores y supervisores');
-    const d=await r.json();status.textContent=d.configured?'Correo listo: '+d.mailbox:'Contraseña IMAP aún no disponible en Render';
+    const d=await r.json();status.textContent=d.configured?'Buzón configurado, pero falta importar los correos. Haz clic en Sincronizar Enviados y Recibidos.':'Contraseña IMAP aún no disponible en Render';
     button.disabled=!d.configured;
     if(d.configured)await load()
   }catch(e){status.textContent=e.message;button.disabled=true}
