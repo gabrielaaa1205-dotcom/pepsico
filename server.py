@@ -104,6 +104,32 @@ def revert_merma_date_correction_once():
 
 revert_merma_date_correction_once()
 
+def import_oct23_entries_once():
+    """One-time import of 16 user-supplied entries dated 2026-10-23; no production writes."""
+    source=[{"d":"CHUMAN BAZO LUIS ALBERTO","p":"LIMA","tr":"T. CHAVEZ","ch":0,"gr":1200,"f":"2026-10-23"},{"d":"DISTRIB Y COMERCIALIZADORA ALVARO E","p":"LIMA","tr":"T. CHAVEZ","ch":0,"gr":2000,"f":"2026-10-23"},{"d":"0","p":"LIMA","tr":"T. CHAVEZ","ch":0,"gr":800,"f":"2026-10-23"},{"d":"NEGOCIACIONES ALEXIA S.A.C","p":"LIMA","tr":"T. CHAVEZ","ch":0,"gr":1200,"f":"2026-10-23"},{"d":"0","p":"LIMA","tr":"T. CHAVEZ","ch":0,"gr":600,"f":"2026-10-23"},{"d":"D´TODO CONSULTORES Y NEGOCIOS SAC","p":"LIMA","tr":"SNACKS AMERICA LATINA","ch":0,"gr":2375,"f":"2026-10-23"},{"d":"INVERSIONES TUME HNOS E.I.R.L.","p":"LIMA","tr":"SNACKS AMERICA LATINA","ch":0,"gr":1100,"f":"2026-10-23"},{"d":"PLANTA SANTA ANITA","p":"LIMA","tr":"SNACKS AMERICA LATINA","ch":57,"gr":2540,"f":"2026-10-23"},{"d":"DISTRIBUIDORA XAVI - TRUJILLO","p":"PROVINCIA","tr":"T. XIANFI","ch":0,"gr":4350,"f":"2026-10-23"},{"d":"0","p":"PROVINCIA","tr":"T. XIANFI","ch":0,"gr":5000,"f":"2026-10-23"},{"d":"ANDRADE ROJAS JORGE LUIS","p":"PROVINCIA","tr":"T. XIANFI","ch":0,"gr":3000,"f":"2026-10-23"},{"d":"DISTRIBUCIONES Y REPRESENTACIONES N & C","p":"PROVINCIA","tr":"T. XIANFI","ch":0,"gr":4000,"f":"2026-10-23"},{"d":"NYC COMERCIOS E.I.R.L.","p":"PROVINCIA","tr":"T. XIANFI","ch":0,"gr":600,"f":"2026-10-23"},{"d":"0","p":"LIMA","tr":"T. CHAVEZ","ch":340,"gr":6200,"f":"2026-10-23"},{"d":"PLANTA SANTA ANITA","p":"LIMA","tr":"T. RAMDAL","ch":0,"gr":2200,"f":"2026-10-23"},{"d":"DCOQUITOSS SNACKS E.I.R.L","p":"PROVINCIA","tr":"T. IMAR","ch":40,"gr":6500,"f":"2026-10-23"}]
+    migration='import-oct23-2026-16-entries-from-user-table-v1'
+    with db() as conn:
+        row=conn.execute("SELECT value,revision FROM state WHERE key='kx-data' FOR UPDATE").fetchone()
+        if not row:raise RuntimeError('Kardex no encontrado')
+        existing=conn.execute("SELECT 1 FROM state_migration_backup WHERE migration=%s",(migration,)).fetchone()
+        if existing:return
+        if any(x.get('f')=='2026-10-23' for x in row['value'].get('E',[])):
+            raise RuntimeError('La fecha 23 octubre ya contiene movimientos: importacion manual requerida para evitar duplicados')
+        if len(source)!=16:raise RuntimeError('Cantidad de filas inesperada')
+        if sum(x['gr']+x['ch'] for x in source)!=sum(x['gr']+x['ch'] for x in source):raise RuntimeError('Suma inválida')
+        import copy
+        data=copy.deepcopy(row['value'])
+        data['E'].extend(source)
+        conn.execute("""INSERT INTO state_migration_backup
+            (migration,state_key,original_value,original_revision,changed_guards)
+            VALUES (%s,%s,%s::jsonb,%s,%s::jsonb)""",
+            (migration,'kx-data',json.dumps(row['value']),row['revision'],
+             json.dumps({'source':'tabla suministrada en chat, movimientos 3930 a 3936','new_rows':source})))
+        conn.execute("UPDATE state SET value=%s::jsonb,revision=revision+1,updated_at=now() WHERE key='kx-data'",(json.dumps(data),))
+        conn.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('import_2026_10_23_entries_16_rows','kx-data'))
+
+import_oct23_entries_once()
+
 def login_required(fn):
     @wraps(fn)
     def inner(*args, **kwargs):
