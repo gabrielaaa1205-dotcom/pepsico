@@ -98,7 +98,7 @@ def sync():
                 uids=ids[0].split() if ids and ids[0] else []
                 with database() as c:
                     ensure_tables(c)
-                    row=c.execute('SELECT processed FROM egrid_scan_cursor WHERE folder=%s',(alias,)).fetchone()
+                    row=c.execute('SELECT processed FROM egrid_scan_cursor WHERE folder=%s',(alias+'-full-search-v2',)).fetchone()
                     offset=row['processed'] if row else 0
                 uids=list(reversed(uids))
                 batch=uids[offset:offset+12]
@@ -143,7 +143,7 @@ def sync():
                                     (inv,alias,mid.decode(),filename[:240],blob)).fetchone()
                                 attachments+=bool(result)
                 with database() as c:
-                    c.execute('INSERT INTO egrid_scan_cursor(folder,processed) VALUES (%s,%s) ON CONFLICT(folder) DO UPDATE SET processed=EXCLUDED.processed',(alias,offset+len(batch)))
+                    c.execute('INSERT INTO egrid_scan_cursor(folder,processed) VALUES (%s,%s) ON CONFLICT(folder) DO UPDATE SET processed=EXCLUDED.processed',(alias+'-full-search-v2',offset+len(batch)))
         finally:
             try:imap.logout()
             except Exception:pass
