@@ -59,9 +59,8 @@ def email_text(msg):
 def classify(mailbox,sender,recipient,subject,body):
     sender=sender.lower();recipient=recipient.lower()
     if mailbox=='sent':
-        # Sent Kardex reports may be addressed to PepsiCo colleagues rather than e-grid.
-        # Only reports matching Kardex concepts are persisted separately.
-        return 'enviado'
+        if 'compras@e-grid.app' in recipient.lower():return 'enviado'
+        return None
     if 'gabriela.diaz@cianse.com' in sender and 'compras@e-grid.app' in recipient:return 'enviado'
     if 'noreply@e-grid.app' not in sender:return None
     t=(subject+' '+body[:5000]).lower()
@@ -126,8 +125,9 @@ def sync():
                     sender=decode(msg.get('From'));recipient=decode(msg.get('To'));subject=decode(msg.get('Subject'))
                     body=email_text(msg)
                     state=classify(alias,sender,recipient,subject,body)
+                    if not state and alias=='sent':state='kardex_candidate'
                     if not state:continue
-                    if state=='enviado':
+                    if state in ('enviado','kardex_candidate'):
                         filenames=[decode(p.get_filename()) for p in msg.walk() if p.get_filename()]
                         descriptor=(subject+' '+' '.join(filenames)).lower()
                         concepts=[]
@@ -154,6 +154,7 @@ def sync():
                             pdfs.append((filename,blob))
                             candidates.update(number_candidates(filename))
                     if not candidates:continue
+                    if state=='kardex_candidate':continue
                     try:dt=parsedate_to_datetime(msg.get('Date'))
                     except:dt=None
                     with database() as c:
