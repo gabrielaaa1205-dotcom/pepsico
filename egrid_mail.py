@@ -356,3 +356,39 @@ def folder_diagnostics():
     except Exception as exc:
         return jsonify(error='No se pudo consultar IMAP',kind=type(exc).__name__),502
     return jsonify(folders=result)
+
+@bp_mail.route('/api/egrid/import-pdf-zip',methods=['POST'])
+def import_pdf_zip():
+    """Import invoice PDFs from a small ZIP created from locally saved Outlook messages."""
+    authorized()
+    from server import check_csrf
+    import zipfile,hashlib
+    check_csrf()
+    uploaded=request.files.get('file')
+    if not uploaded:return jsonify(error='Selecciona un ZIP con facturas PDF'),400
+    data=uploaded.read(14*1024*1024)
+    if not zipfile.is_zipfile(io.BytesIO(data)):return jsonify(error='Archivo ZIP inválido'),400
+    added=0;skipped=[];invoices=[]
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        names=archive.infolist()
+        if len(names)>200:return jsonify(error='Demasiados archivos'),400
+        with database() as c:
+            ensure_tables(c)
+            for entry in names:
+                name=os.path.basename(entry.filename)
+                if not name.lower().endswith('.pdf') or entry.is_dir():continue
+                matched=re.fullmatch(r'(E001-\d{4})(?:_[a-f0-9]{8})?\.pdf',name,re.I)
+                if not matched or entry.file_size>6*1024*1024:
+                    skipped.append(name);continue
+                inv=matched.group(1).upper()
+                blob=archive.read(entry)
+                if not blob.startswith(b'%PDF-'):
+                    skipped.append(name);continue
+                digest=hashlib.sha256(blob).hexdigest()
+                uid='upload-'+digest
+                inserted=c.execute("""INSERT INTO egrid_pdf(invoice,mailbox,uid,filename,content)
+                     VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING id""",
+                     (inv,'outlook_import',uid,name,blob)).fetchone()
+                if inserted:added+=1;invoices.append(inv)
+    return jsonify(ok=True,new_pdfs=added,invoices=invoices,skipped=skipped,
+      note='PDF importado desde el ZIP de Outlook. El PDF por sí solo no prueba aprobación ni recepción.')
