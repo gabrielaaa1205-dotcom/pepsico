@@ -38,6 +38,12 @@ AMBIGUOUS=set() # Only March duplicate is unresolved; Feb merma is documented.
 # Historical amounts can be entered inclusive or exclusive of Peruvian IGV.
 # Until their tax basis is verified, display both interpretations rather than silently assume.
 IGV_RATE = 0.18
+# Tarifas contractuales únicas: precios unitarios netos en soles.
+STANDARD_RATES = {'buenas': 0.143, 'rechazadas': 0.093, 'merma': 0.070}
+def standardized_rates():
+    """Rates displayed and used in the production valuation and invoice reconciliation."""
+    return STANDARD_RATES.copy()
+
 def invoice_amounts(raw, basis='por_verificar'):
     from decimal import Decimal, ROUND_HALF_UP
     if raw is None:
@@ -60,7 +66,7 @@ def tax_reconciliation(rows):
     result={}
     for number,concept,start,end,raw,state,excel_row in INVOICES:
         items=[r for r in rows if r['category']==concept and start<=r['date']<=end]
-        net=round2(sum((Decimal(str(r['quantity']))*Decimal(str({'buenas':0.143,'rechazadas':0.093,'merma':0.070}[concept])) for r in items),Decimal('0')))
+        net=round2(sum((Decimal(str(r['quantity']))*Decimal(str(STANDARD_RATES[concept])) for r in items),Decimal('0')))
         gross=round2(net*Decimal('1.18'))
         basis='sin_monto' if raw is None else 'diferencia_por_conciliar'
         delta=None
@@ -90,7 +96,7 @@ def summary():
         cfg=conn.execute("SELECT value FROM state WHERE key='kx-cfg'").fetchone()
     source=(data or {}).get('value') or {}
     prices=(cfg or {}).get('value') or {}
-    rates={'buenas':float(prices.get('pBuena',0.143)), 'rechazadas':float(prices.get('pRech',0.093)), 'merma':float(prices.get('pMerma',0.070))}
+    rates=standardized_rates()  # Keep valuation and reconciliation on identical tariffs; do not alter saved config.
     tr_name=str(prices.get('trRech') or '').strip().upper()
     output=[]
     for guide in source.get('S',[]):
