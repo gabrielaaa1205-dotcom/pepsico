@@ -6,6 +6,22 @@
   importBox.style.cssText='margin:12px 0;padding:13px;background:#f1f8f5;border-radius:10px';
   importBox.innerHTML='<strong>Importar facturas históricas de Outlook</strong><p class="muted">Selecciona el ZIP preparado con las facturas PDF.</p><input id="egrid-zip" type="file" accept=".zip,application/zip" style="max-width:100%;margin-right:8px"><button type="button" class="btn" id="egrid-import">Importar PDF al Kardex</button><p class="muted" id="egrid-import-status"></p>';
   panel.insertBefore(importBox,panel.querySelector('#egrid-evidence'));
+  const msgImport=document.createElement('div');
+  msgImport.style.cssText='margin:12px 0;padding:13px;border:1px solid #daeae3;border-radius:10px';
+  msgImport.innerHTML='<strong>Importar correos enviados desde Outlook</strong><p class="muted">Selecciona un ZIP con los correos originales .msg de la otra PC. Se recuperarán la fecha, el destinatario y el asunto de cada factura.</p><input id="msg-zip" type="file" accept=".zip" style="max-width:100%"><button type="button" class="btn" id="msg-import">Importar correos .msg</button><p class="muted" id="msg-result"></p>';
+  panel.insertBefore(msgImport,panel.querySelector('#egrid-evidence'));
+  msgImport.querySelector('#msg-import').onclick=async()=>{
+    const file=msgImport.querySelector('#msg-zip').files?.[0],out=msgImport.querySelector('#msg-result'),btn=msgImport.querySelector('#msg-import');
+    if(!file){out.textContent='Selecciona un archivo ZIP.';return}
+    btn.disabled=true;out.textContent='Leyendo mensajes originales de Outlook…';
+    try{
+      const fd=new FormData();fd.append('file',file);
+      const r=await fetch('/api/egrid/import-outlook-msg',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''},body:fd});
+      const d=await r.json();if(!r.ok)throw Error(d.error||'No se pudo importar');
+      out.textContent='Evidencias de envío añadidas: '+d.added+'. '+(d.skipped?.length?'Mensajes sin coincidencia: '+d.skipped.length:'');
+      await load();
+    }catch(e){out.textContent='Error: '+e.message}finally{btn.disabled=false}
+  };
   const reopen=document.createElement('button');
   reopen.type='button';reopen.className='btn ghost';reopen.textContent='Importar más facturas';
   reopen.style.cssText='display:none;margin:8px 0';
