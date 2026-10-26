@@ -33,6 +33,14 @@ INVOICES=[
 ('E001-2431','rechazadas','2026-07-01','2026-07-31',6118.11,'Enviado',209),
 ('E001-2430','buenas','2026-08-01','2026-08-31',51524.76,'Enviado',210),
 ]
+# Evidencia directa del Excel presentado para E001-2354: solo estas 14 guias.
+# Las otras 12 guias de merma de junio siguen existiendo pero NO pertenecen a este comprobante.
+E001_2354_GUIDES = {'EG07-00001932','EG07-00001940','EG07-00001950','EG07-00001964','EG07-00001967','EG07-00001969','EG07-00001975','EG07-00001979','EG07-00001981','EG07-00001994','EG07-00001997','EG07-00002000','EG07-00002005','EG07-00002014'}
+def invoice_guides(number, rows, concept, start, end):
+    if number == 'E001-2354':
+        return [r for r in rows if r['category']==concept and r['guide'] in E001_2354_GUIDES]
+    return [r for r in rows if r['category']==concept and start<=r['date']<=end]
+
 AMBIGUOUS=set() # Only March duplicate is unresolved; Feb merma is documented.
 
 # Historical amounts can be entered inclusive or exclusive of Peruvian IGV.
@@ -65,7 +73,7 @@ def tax_reconciliation(rows):
     round2=lambda n: n.quantize(Decimal('0.01'),rounding=ROUND_HALF_UP)
     result={}
     for number,concept,start,end,raw,state,excel_row in INVOICES:
-        items=[r for r in rows if r['category']==concept and start<=r['date']<=end]
+        items=invoice_guides(number,rows,concept,start,end)
         net=round2(sum((Decimal(str(r['quantity']))*Decimal(str(STANDARD_RATES[concept])) for r in items),Decimal('0')))
         gross=round2(net*Decimal('1.18'))
         basis='sin_monto' if raw is None else 'diferencia_por_conciliar'
@@ -85,6 +93,16 @@ def tax_reconciliation(rows):
                     'invoice_issued':'2026-05-07','purchase_order_date':'2026-04-13',
                     'note':'Comprobante verificado: 36,167 cajas a S/ 0.093, total S/ 3,968.97 con IGV. Revisar las guías y el período.'
                 }
+                continue
+            if number=='E001-2354':
+                delta=round2(abs(supplied-gross))
+                result[number+'|'+concept+'|'+start]={
+                    'basis':'comprobante_con_igv_diferencia',
+                    'kardex_net':float(net),'kardex_igv':float(gross-net),
+                    'kardex_gross':float(gross),'difference':float(delta),
+                    'guide_count':len(set(r['guide'] for r in items)),
+                    'invoice_gross':7727.31,'invoice_quantity':93551,
+                    'note':'14 guias del Excel (93,550 cajas). OC y factura: 93,551 cajas, diferencia de 1 caja; no incluir otras 12 guias de junio.'}
                 continue
             difference_net=abs(supplied-net)
             difference_gross=abs(supplied-gross)
@@ -144,8 +162,8 @@ def summary():
 def billing_report():
     if not secure():return redirect('/login')
     rows=summary()
-    estimated_amounts = { (v[0]+'|'+v[1]+'|'+v[2]): round(sum(r['estimated'] for r in rows if r['category']==v[1] and v[2]<=r['date']<=v[3]),2) for v in INVOICES }
-    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES,estimated_amounts=estimated_amounts,tax_reconciliations=tax_reconciliation(rows))
+    estimated_amounts = { (v[0]+'|'+v[1]+'|'+v[2]): round(sum(r['estimated'] for r in invoice_guides(v[0], rows, v[1], v[2], v[3])),2) for v in INVOICES }
+    return render_template('facturacion_kardex.html',rows=rows,invoices=INVOICES,estimated_amounts=estimated_amounts,tax_reconciliations=tax_reconciliation(rows),invoice_guide_ids={'E001-2354':sorted(E001_2354_GUIDES)})
 
 @bp_billing2026.route('/api/facturacion-resumen')
 def billing_summary_api():
