@@ -56,6 +56,20 @@
   async function load(){
     const r=await fetch('/api/egrid/invoices');if(!r.ok)throw Error('No se puede leer el seguimiento de e-grid');
     const d=await r.json();if((d.imported_pdf_count||0)>0)completeImport();target.replaceChildren();
+    panel.querySelector('#egrid-stock-cards')?.remove();
+    const stockSection=document.createElement('section');stockSection.id='egrid-stock-cards';
+    stockSection.style.cssText='margin:12px 0';
+    const stockTitle=document.createElement('h3');stockTitle.textContent='Reportes recibidos · Stock, ingresos y salidas';stockSection.append(stockTitle);
+    const stockReports=d.stock_reports||[];
+    if(!stockReports.length){const no=document.createElement('p');no.className='muted';no.textContent='No se detectaron reportes de Laura en el buzón IMAP conectado. Los correos solo guardados en otro Outlook no se muestran.';stockSection.append(no)}
+    for(const report of stockReports){
+      const item=document.createElement('article');item.style.cssText='border:1px solid #daeae3;border-radius:10px;padding:12px;margin:8px 0';
+      const heading=document.createElement('strong');heading.textContent=report.report_type==='stock_ingresos_salidas'?'Stock, ingresos y salidas':report.report_type==='stock'?'Stock':'Ingresos y salidas';item.append(heading);
+      for(const line of ['Remitente: '+(report.sender||'No indicado'),'Fecha: '+(report.date?new Date(report.date).toLocaleString('es-PE'):'No indicada'),'Asunto: '+(report.subject||'Sin asunto'),'Archivos: '+(report.filenames||'No identificados')]){const p=document.createElement('p');p.textContent=line;item.append(p)}
+      const info=document.createElement('small');info.textContent='Correo localizado. Datos de inventario pendientes de validar e importar.';item.append(info);
+      stockSection.append(item);
+    }
+    panel.insertBefore(stockSection,archive);
     const existing=panel.querySelector('#egrid-kardex-cards');if(existing)existing.remove();
     const reportsSection=document.createElement('section');reportsSection.id='egrid-kardex-cards';
     reportsSection.style.cssText='margin:12px 0 16px';
