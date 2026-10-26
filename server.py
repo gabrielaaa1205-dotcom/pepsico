@@ -74,6 +74,36 @@ def correct_merma_june_2026_once():
 
 correct_merma_june_2026_once()
 
+def revert_merma_date_correction_once():
+    """Restore just the 14 mistaken date changes, preserving other production data."""
+    migration='revert-merma-june-2026-guide-dates-v1'
+    with db() as conn:
+        row=conn.execute("SELECT value,revision FROM state WHERE key='kx-data' FOR UPDATE").fetchone()
+        if conn.execute("SELECT 1 FROM state_migration_backup WHERE migration=%s",(migration,)).fetchone():
+            return
+        original=conn.execute("SELECT changed_guards FROM state_migration_backup WHERE migration='fix-merma-june-2026-guide-dates-v1'").fetchone()
+        if not row or not original or len(original['changed_guards'])!=14:
+            raise RuntimeError('No se pudo verificar el respaldo para deshacer las 14 fechas')
+        before={x['guia']:x for x in original['changed_guards']}
+        import copy
+        updated=copy.deepcopy(row['value'])
+        matched=[g for g in updated.get('S',[]) if g.get('guia') in before]
+        if len(matched)!=14:
+            raise RuntimeError('Rollback cancelado: guias no coinciden')
+        for g in matched:
+            b=before[g['guia']]
+            if g.get('f')!=b['to'] or float(g.get('me') or 0)!=float(b['merma']):
+                raise RuntimeError('Rollback cancelado: una guia ya fue editada posteriormente')
+            g['f']=b['from']
+        conn.execute("""INSERT INTO state_migration_backup
+            (migration,state_key,original_value,original_revision,changed_guards)
+            VALUES (%s,%s,%s::jsonb,%s,%s::jsonb)""",
+            (migration,'kx-data',json.dumps(row['value']),row['revision'],json.dumps(original['changed_guards'])))
+        conn.execute("UPDATE state SET value=%s::jsonb,revision=revision+1,updated_at=now() WHERE key='kx-data'",(json.dumps(updated),))
+        conn.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('revert_merma_14_dates_to_original','kx-data'))
+
+revert_merma_date_correction_once()
+
 def login_required(fn):
     @wraps(fn)
     def inner(*args, **kwargs):
