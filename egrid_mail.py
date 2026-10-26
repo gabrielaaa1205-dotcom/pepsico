@@ -84,7 +84,9 @@ def sync():
             ok,folders=imap.list()
             folders_text=[x.decode('utf-8',errors='replace') for x in (folders or [])]
             sent_candidates=['Sent','INBOX.Sent','Sent Messages','INBOX.Sent Messages','Enviados']
-            sent=next((x for x in sent_candidates if any(x.lower() in f.lower() for f in folders_text)),None)
+            sent=next((x for x in sent_candidates if any(('"'+x+'"').lower() in line.lower() or line.lower().endswith(' '+x.lower()) for line in folders_text)),None)
+            if not sent:
+                sent=next((line.rsplit('"',2)[1] for line in folders_text if ('\\Sent' in line or 'sent' in line.lower() or 'enviad' in line.lower()) and line.count('"')>=2),None)
             for alias,folder in [('received','INBOX'),('sent',sent)]:
                 if not folder:
                     warnings.append('No se encontró carpeta Enviados');continue
@@ -146,7 +148,7 @@ def sync():
             except Exception:pass
     except Exception as e:
         return jsonify(error='Error de conexión IMAP. Comprueba usuario, contraseña y acceso de red.',kind=type(e).__name__),502
-    return jsonify(ok=True,new_events=updates,new_pdfs=attachments,warnings=warnings,note='Importación por lotes: vuelve a pulsar para continuar con correos anteriores.')
+    return jsonify(ok=True,new_events=updates,new_pdfs=attachments,warnings=warnings,note='Importación por lotes; las carpetas sin coincidencias no producen PDF.')
 @bp_mail.route('/api/egrid/invoices')
 def invoices():
     authorized()
