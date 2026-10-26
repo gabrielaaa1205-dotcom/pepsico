@@ -29,6 +29,51 @@ def initialize():
             c.execute('INSERT INTO users(username,password_hash,role) VALUES (%s,%s,%s)', (username, generate_password_hash(password), 'admin'))
 initialize()
 
+def correct_merma_june_2026_once():
+    """One-time, fully backed-up correction authorized by CIANSE for 14 specific guides."""
+    guides = {
+        'EG07-00001932','EG07-00001940','EG07-00001950','EG07-00001964',
+        'EG07-00001967','EG07-00001969','EG07-00001975','EG07-00001979',
+        'EG07-00001981','EG07-00001994','EG07-00001997','EG07-00002000',
+        'EG07-00002005','EG07-00002014'
+    }
+    migration = 'fix-merma-june-2026-guide-dates-v1'
+    with db() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS state_migration_backup
+            (migration TEXT PRIMARY KEY, state_key TEXT NOT NULL, original_value JSONB NOT NULL,
+             original_revision BIGINT NOT NULL, changed_guards JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())""")
+        row=conn.execute("SELECT value,revision FROM state WHERE key='kx-data' FOR UPDATE").fetchone()
+        if not row: raise RuntimeError('No se encontro el Kardex; no se puede corregir')
+        existing=conn.execute("SELECT 1 FROM state_migration_backup WHERE migration=%s",(migration,)).fetchone()
+        if existing:return
+        data=row['value']
+        source=data.get('S',[])
+        matched=[g for g in source if g.get('guia') in guides]
+        if len(matched)!=14 or {g.get('guia') for g in matched}!=guides:
+            raise RuntimeError('Migracion cancelada: no coinciden las 14 guias exactas')
+        if any(not str(g.get('f','')).startswith('2026-04-') for g in matched):
+            raise RuntimeError('Migracion cancelada: fechas de origen inesperadas')
+        if sum(float(g.get('me') or 0) for g in matched)!=93550:
+            raise RuntimeError('Migracion cancelada: cantidad de merma inesperada')
+        import copy
+        updated=copy.deepcopy(data)
+        changed=[]
+        for g in updated['S']:
+            if g.get('guia') in guides:
+                previous=g['f']
+                g['f']='2026-06-'+previous[-2:]
+                changed.append({'guia':g['guia'],'from':previous,'to':g['f'],'merma':g['me']})
+        conn.execute("""INSERT INTO state_migration_backup
+            (migration,state_key,original_value,original_revision,changed_guards)
+            VALUES (%s,%s,%s::jsonb,%s,%s::jsonb)""",
+            (migration,'kx-data',json.dumps(data),row['revision'],json.dumps(changed)))
+        conn.execute("UPDATE state SET value=%s::jsonb,revision=revision+1,updated_at=now() WHERE key='kx-data'",
+                     (json.dumps(updated),))
+        conn.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",
+                     ('correct_merma_june_2026_dates_14_guides', 'kx-data'))
+
+correct_merma_june_2026_once()
+
 def login_required(fn):
     @wraps(fn)
     def inner(*args, **kwargs):
