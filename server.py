@@ -130,6 +130,30 @@ def import_oct23_entries_once():
 
 import_oct23_entries_once()
 
+def import_oct22_24_production_once():
+    """Safely import verified production totals from Laura's Oct 24 Excel."""
+    source=[{"f":"2026-10-22","ing":29175,"sal":28150,"b":12941,"r":723,"e":4725},{"f":"2026-10-23","ing":44102,"sal":14400,"b":11255,"r":1432,"e":3490},{"f":"2026-10-24","ing":0,"sal":13490,"b":7859,"r":1075,"e":2925}]
+    migration='import-production-2026-10-22-24-laura-excel-v1'
+    with db() as conn:
+        row=conn.execute("SELECT value,revision FROM state WHERE key='kx-data' FOR UPDATE").fetchone()
+        if not row:raise RuntimeError('Kardex no encontrado')
+        if conn.execute("SELECT 1 FROM state_migration_backup WHERE migration=%s",(migration,)).fetchone():return
+        if any(p.get('f') in ('2026-10-22','2026-10-23','2026-10-24') for p in row['value'].get('P',[])):
+            raise RuntimeError('Produccion ya contiene una fecha objetivo: importar manualmente para evitar duplicados')
+        for p in source:
+            if p['b']+p['r']+p['e']<0:raise RuntimeError('Produccion invalida')
+        import copy
+        data=copy.deepcopy(row['value'])
+        data['P'].extend(source)
+        conn.execute("""INSERT INTO state_migration_backup
+            (migration,state_key,original_value,original_revision,changed_guards)
+            VALUES (%s,%s,%s::jsonb,%s,%s::jsonb)""",
+            (migration,'kx-data',json.dumps(row['value']),row['revision'],
+             json.dumps({'source':'KARDEX PRODUCCION DIARIO 2026(1).xlsx, SELECCIÓN_DIARIO','new_rows':source,'note':'Oct 22 two source rows combined; 24 ingress blank is not proof of zero'})))
+        conn.execute("UPDATE state SET value=%s::jsonb,revision=revision+1,updated_at=now() WHERE key='kx-data'",(json.dumps(data),))
+        conn.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('import_production_22_24_oct_2026','kx-data'))
+import_oct22_24_production_once()
+
 def login_required(fn):
     @wraps(fn)
     def inner(*args, **kwargs):
