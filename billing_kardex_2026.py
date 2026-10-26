@@ -170,3 +170,6 @@ def billing_blocks():
                        'amount':invoice_amounts(amount),'source_row':row,
                        'review':'Monto con/sin IGV sin verificar; conciliar con comprobante'})
     return jsonify(blocks=blocks,igv_rate=IGV_RATE)
+
+from egrid_mail import bp_mail
+bp_billing2026.register_blueprint(bp_mail)
