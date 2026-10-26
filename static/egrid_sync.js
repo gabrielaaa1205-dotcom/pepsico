@@ -22,19 +22,30 @@
     if(!target.childElementCount){target.textContent='Aún no hay evidencias importadas.'}
     function attachCards(){for(const card of document.querySelectorAll('.invoice-card')){const raw=card.querySelector('.invoice-card-number')?.textContent||'';const match=raw.match(/E001-\d+/);if(!match)continue;const obj=(d.invoices||{})[match[0]];card.querySelector('.egrid-inline')?.remove();const box=document.createElement('div');box.className='egrid-inline';box.style.cssText='margin-top:12px;padding-top:9px;border-top:1px solid #dfebe6;font-size:12px';for(const [kind,label] of [['enviado','Envío'],['recibido','Recepción'],['aprobado','Aprobación'],['rechazado','Rechazo']]){const ev=obj?.events?.[kind];const p=document.createElement('div');p.textContent=label+': '+(ev?ev.date||'Correo sin fecha':'Sin evidencia');box.append(p)}for(const pdf of obj?.pdfs||[]){const a=document.createElement('a');a.href='/api/egrid/pdf/'+pdf.id;a.target='_blank';a.textContent='📄 Abrir factura PDF: '+pdf.filename;a.style.cssText='display:block;margin:8px 0;color:#146a5c;font-weight:700';box.append(a)}if(!(obj?.pdfs||[]).length){const no=document.createElement('div');no.textContent='Factura PDF: pendiente de localizar en el correo';no.style.cssText='margin-top:8px;color:#8a5c23';box.append(no)}card.append(box)}}attachCards();if(typeof renderInvoices==='function'&&!window.egridWrapped){const original=renderInvoices;window.renderInvoices=function(){original();attachCards()};window.egridWrapped=true}
   }
-  button.onclick=async()=>{
-    button.disabled=true;status.textContent='Leyendo correo de DreamHost…';
+  let syncing=false;
+  async function syncBatches(maxBatches=6){
+    if(syncing)return;syncing=true;button.disabled=true;
+    let totalEvents=0,totalPdfs=0;
     try{
-      const r=await fetch('/api/egrid/sync',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''}});
-      const responseText=await r.text();let d;try{d=JSON.parse(responseText)}catch(_){throw Error('El servidor interrumpió la sincronización. Intenta nuevamente; los lotes procesados se conservan.')}if(!r.ok)throw Error(d.error||'Error de sincronización');
-      status.textContent='Lote terminado · evidencias nuevas: '+d.new_events+' · PDF nuevos: '+d.new_pdfs+' · Pulsa nuevamente para continuar con correos antiguos. '+(d.warnings||[]).join('; ');
-      await load();
-    }catch(e){status.textContent=e.message}finally{button.disabled=false}
-  };
+      for(let step=0;step<maxBatches;step++){
+        status.textContent='Buscando facturas en DreamHost · lote '+(step+1)+' de '+maxBatches+'…';
+        const r=await fetch('/api/egrid/sync',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''}});
+        const body=await r.text();let d;
+        try{d=JSON.parse(body)}catch(_){throw Error('La conexión fue interrumpida por el servidor')}
+        if(!r.ok)throw Error(d.error||'Error de sincronización');
+        totalEvents+=d.new_events||0;totalPdfs+=d.new_pdfs||0;
+        await load();
+        if(d.complete)break;
+      }
+      status.textContent='Búsqueda realizada · '+totalEvents+' evidencias y '+totalPdfs+' PDF nuevos. Puedes repetirla para ampliar el historial.';
+    }catch(e){status.textContent='Sincronización incompleta: '+e.message}
+    finally{syncing=false;button.disabled=false}
+  }
+  button.onclick=()=>syncBatches(6);
   try{
     const r=await fetch('/api/egrid/status');if(!r.ok)throw Error('Acceso permitido solo a administradores y supervisores');
     const d=await r.json();status.textContent=d.configured?'Buzón configurado, pero falta importar los correos. Haz clic en Sincronizar Enviados y Recibidos.':'Contraseña IMAP aún no disponible en Render';
     button.disabled=!d.configured;
-    if(d.configured)await load()
+    if(d.configured){await load();await syncBatches(6)}
   }catch(e){status.textContent=e.message;button.disabled=true}
 })();
