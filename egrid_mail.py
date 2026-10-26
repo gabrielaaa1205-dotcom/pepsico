@@ -56,6 +56,7 @@ def classify(mailbox,sender,recipient,subject,body):
     if mailbox=='sent':
         if 'compras@e-grid.app' in recipient.lower():return 'enviado'
         return None
+    if 'gabriela.diaz@cianse.com' in sender and 'compras@e-grid.app' in recipient:return 'enviado'
     if 'noreply@e-grid.app' not in sender:return None
     t=(subject+' '+body[:5000]).lower()
     if re.search(r'\b(rechazad[ao]|rejected|no aprobada|observad[ao])\b',t):return 'rechazado'
