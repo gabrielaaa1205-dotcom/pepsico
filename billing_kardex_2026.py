@@ -72,6 +72,20 @@ def tax_reconciliation(rows):
         delta=None
         if raw is not None and start>='2026-01-01':
             supplied=Decimal(str(raw))
+            # Verified original invoice E001-2188: S/ 3,968.97 includes IGV.
+            # Compare gross with gross, not the closer of net/gross.
+            if number=='E001-2188':
+                delta=round2(abs(supplied-gross))
+                basis='comprobante_con_igv_diferencia' if delta>Decimal('1.00') else 'con_igv'
+                result[number+'|'+concept+'|'+start]={
+                    'basis':basis,'kardex_net':float(net),'kardex_igv':float(gross-net),
+                    'kardex_gross':float(gross),'difference':float(delta),
+                    'guide_count':len(set(r['guide'] or r['date'] for r in items)),
+                    'invoice_gross':float(supplied),'invoice_quantity':36167,
+                    'invoice_issued':'2026-05-07','purchase_order_date':'2026-04-13',
+                    'note':'Comprobante verificado: 36,167 cajas a S/ 0.093, total S/ 3,968.97 con IGV. Revisar las guías y el período.'
+                }
+                continue
             difference_net=abs(supplied-net)
             difference_gross=abs(supplied-gross)
             delta=round2(min(difference_net,difference_gross))
