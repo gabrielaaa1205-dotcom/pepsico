@@ -58,4 +58,4 @@ card.append(header,period,n,val,taxes,detail);grid.append(card)}
 }}
 $('invoiceMonth').addEventListener('change',renderInvoices);$('invoiceType').addEventListener('change',renderInvoices);$('invoiceSearch').addEventListener('input',renderInvoices);$('invoiceExport').onclick=()=>csvSave([['Desde','Hasta','Concepto','Factura','Monto en Excel','Estado','Fila Excel'],...invoiceFiltered().map(x=>[x[2],x[3],x[1],x[0],x[4],x[5],x[6]])],'CIANSE_bloques_facturacion_2026.csv');
 try{initInvoiceFilters()}catch(e){console.error("Factura / filtros",e)}try{periods()}catch(e){console.error("Dashboard / filtros",e)}
-</script><script>window.EGRID_CSRF={{ session.get('csrf','')|tojson }};</script><script src="/static/egrid_sync.js?v=20261026-kardex-sent-cards"></script></body></html>
+</script><script>window.EGRID_CSRF={{ session.get('csrf','')|tojson }};</script><script src="/static/egrid_sync.js?v=20261026-outlook-msg-import"></script></body></html>
