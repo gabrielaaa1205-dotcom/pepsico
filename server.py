@@ -6,7 +6,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+app.secret_key = os.environ.get('SECRET_KEY') or __import__('hashlib').sha256(('cianse-session-v1:'+os.environ['DATABASE_URL']).encode()).hexdigest()
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', SESSION_COOKIE_SECURE=os.getenv('APP_ENV') == 'production', MAX_CONTENT_LENGTH=15*1024*1024, PERMANENT_SESSION_LIFETIME=datetime.timedelta(hours=10))
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
