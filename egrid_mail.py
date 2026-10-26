@@ -76,7 +76,7 @@ def sync():
     password,user=imap_creds()
     if not password:return jsonify(error='Falta DREAMHOST_IMAP_PASSWORD en Render'),503
     host=os.getenv('DREAMHOST_IMAP_HOST','imap.dreamhost.com')
-    updates=0;attachments=0;warnings=[]
+    updates=0;attachments=0;warnings=[];scan_info={}
     try:
         imap=imaplib.IMAP4_SSL(host,993,timeout=22)
         try:
@@ -89,12 +89,12 @@ def sync():
                 sent=next((line.rsplit('"',2)[1] for line in folders_text if ('\\Sent' in line or 'sent' in line.lower() or 'enviad' in line.lower()) and line.count('"')>=2),None)
             for alias,folder in [('received','INBOX'),('sent',sent)]:
                 if not folder:
-                    warnings.append('No se encontró carpeta Enviados');continue
+                    warnings.append('No se encontró carpeta Enviados');scan_info[alias]={'error':'carpeta_no_encontrada','available_folders':folders_text};continue
                 if imap.select('"'+folder.replace('"','')+'"',readonly=True)[0]!='OK':
-                    warnings.append('No se pudo abrir '+folder);continue
+                    warnings.append('No se pudo abrir '+folder);scan_info[alias]={'error':'carpeta_no_accesible','folder':folder};continue
                 since=(datetime.date.today()-datetime.timedelta(days=390)).strftime('%d-%b-%Y')
                 typ,ids=imap.search(None,'SINCE',since,'FROM' if alias=='received' else 'TO','noreply@e-grid.app' if alias=='received' else 'e-grid.app')
-                if typ!='OK':continue
+                if typ!='OK':warnings.append('Búsqueda IMAP fallida: '+alias);continue
                 uids=ids[0].split() if ids and ids[0] else []
                 with database() as c:
                     ensure_tables(c)
@@ -102,6 +102,7 @@ def sync():
                     offset=row['processed'] if row else 0
                 uids=list(reversed(uids))
                 batch=uids[offset:offset+18]
+                scan_info[alias]={'folder':folder,'matched':len(uids),'processed_before':offset,'this_batch':len(batch)}
                 for mid in batch:
                     typ,parts=imap.fetch(mid,'(RFC822)')
                     if typ!='OK':continue
@@ -148,7 +149,7 @@ def sync():
             except Exception:pass
     except Exception as e:
         return jsonify(error='Error de conexión IMAP. Comprueba usuario, contraseña y acceso de red.',kind=type(e).__name__),502
-    return jsonify(ok=True,new_events=updates,new_pdfs=attachments,warnings=warnings,note='Importación por lotes; las carpetas sin coincidencias no producen PDF.')
+    return jsonify(ok=True,new_events=updates,new_pdfs=attachments,warnings=warnings,scan=scan_info,complete=all(v.get('processed_before',0)+v.get('this_batch',0)>=v.get('matched',0) for v in scan_info.values() if 'matched' in v),note='Importación por lotes; las carpetas sin coincidencias no producen PDF.')
 @bp_mail.route('/api/egrid/invoices')
 def invoices():
     authorized()
