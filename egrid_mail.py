@@ -136,7 +136,7 @@ def sync():
                         # Require both a stock-related topic and a known reporter label;
                         # never infer stock movements from an email.
                         reporter=('laura' in sender.lower() or 'laura' in subject.lower())
-                        report_stock=bool(re.search(r'\\bstock\\b|inventario',descriptor))
+                        report_stock=bool(re.search(r'\bstock\b|inventario',descriptor))
                         report_flow=bool(re.search(r'ingresos?|salidas?',descriptor))
                         if reporter and (report_stock or report_flow):
                             category='stock_ingresos_salidas' if report_stock and report_flow else ('stock' if report_stock else 'ingresos_salidas')
