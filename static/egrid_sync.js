@@ -31,8 +31,8 @@
         status.textContent='Buscando facturas en DreamHost · lote '+(step+1)+' de '+maxBatches+'…';
         const r=await fetch('/api/egrid/sync',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''}});
         const body=await r.text();let d;
-        try{d=JSON.parse(body)}catch(_){throw Error('La conexión fue interrumpida por el servidor')}
-        if(!r.ok)throw Error(d.error||'Error de sincronización');
+        try{d=JSON.parse(body)}catch(_){if(r.status===401||r.status===403)throw Error('Tu sesión expiró. Inicia sesión otra vez y vuelve al panel.');throw Error('El servidor devolvió una página en vez de datos. Consulta el panel o vuelve a iniciar sesión.')}
+        if(r.status===401||r.status===403)throw Error('Tu sesión expiró. Vuelve a iniciar sesión en CIANSE PRO para sincronizar el correo.');if(!r.ok)throw Error(d.error||'Error de sincronización');
         totalEvents+=d.new_events||0;totalPdfs+=d.new_pdfs||0;
         await load();
         if(d.complete)break;
