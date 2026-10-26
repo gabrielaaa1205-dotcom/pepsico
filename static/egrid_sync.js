@@ -2,6 +2,23 @@
   const panel=document.createElement('section');panel.className='panel';
   panel.innerHTML='<h2>PepsiCo · Seguimiento de correos e-grid</h2><p id="egrid-state" class="muted">Verificando configuración del correo…</p><button type="button" id="egrid-sync" class="btn">Sincronizar Enviados y Recibidos</button><div id="egrid-evidence"></div>';
   const main=document.querySelector('main');if(!main)return;main.prepend(panel);
+  const importBox=document.createElement('div');
+  importBox.style.cssText='margin:12px 0;padding:13px;background:#f1f8f5;border-radius:10px';
+  importBox.innerHTML='<strong>Importar facturas históricas de Outlook</strong><p class="muted">Selecciona el ZIP preparado con las facturas PDF.</p><input id="egrid-zip" type="file" accept=".zip,application/zip" style="max-width:100%;margin-right:8px"><button type="button" class="btn" id="egrid-import">Importar PDF al Kardex</button><p class="muted" id="egrid-import-status"></p>';
+  panel.insertBefore(importBox,panel.querySelector('#egrid-evidence'));
+  importBox.querySelector('#egrid-import').onclick=async()=>{
+    const file=importBox.querySelector('#egrid-zip').files?.[0],out=importBox.querySelector('#egrid-import-status');
+    if(!file){out.textContent='Selecciona un ZIP primero.';return}
+    const btn=importBox.querySelector('#egrid-import');btn.disabled=true;out.textContent='Importando facturas…';
+    try{
+      const fd=new FormData();fd.append('file',file);
+      const r=await fetch('/api/egrid/import-pdf-zip',{method:'POST',headers:{'X-CSRF-Token':window.EGRID_CSRF||''},body:fd});
+      const d=await r.json();if(!r.ok)throw Error(d.error||'Error al importar');
+      out.textContent='Importación terminada: '+d.new_pdfs+' facturas PDF nuevas. '+(d.skipped?.length?'No procesadas: '+d.skipped.join(', '):'');
+      await load();
+    }catch(e){out.textContent='Error: '+e.message}
+    finally{btn.disabled=false}
+  };
   const status=panel.querySelector('#egrid-state');
   const button=panel.querySelector('#egrid-sync');
   const target=panel.querySelector('#egrid-evidence');
