@@ -149,6 +149,31 @@ def automatic_upload():
               mime TEXT NOT NULL, parsed JSONB NOT NULL,
               status TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())""")
             status='review' if uncertain else 'parsed'
+            if not uncertain:
+                def checked(v):
+                    try:return integer(v)
+                    except (ValueError,TypeError):return None
+                raw_defects=p.get('defects') or {}
+                raw_colors=p.get('selected_colors') or {}
+                defects={k:checked(raw_defects.get(k)) for k in ('excremento','pisadas','grasa','oxido','plaga')}
+                colors={k:checked(raw_colors.get(k)) for k in ('azul','morado','verde','negro')}
+                # A recognized image can be submitted twice. Do not count it twice.
+                digest=hashlib.sha256(content).hexdigest()
+                prior=c.execute("""SELECT r.id FROM worker_selection_reports r
+                    JOIN worker_selection_photos i ON i.report_id=r.id
+                    WHERE i.digest=%s LIMIT 1""",(digest,)).fetchone()
+                if prior:
+                    created.append({'id':prior['id'],'filename':filename,'status':'duplicate','data':p})
+                    continue
+                report=c.execute("""INSERT INTO worker_selection_reports
+                    (worker,worked_on,transport,pallets,malo,defects,selected_colors,notes,creator)
+                    VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s) RETURNING id""",
+                    (worker,day,transport,checked(p.get('pallets')),checked(p.get('malo')),
+                     json.dumps(defects),json.dumps(colors),str(p.get('notes') or '')[:1500],session['uid'])).fetchone()
+                c.execute("""INSERT INTO worker_selection_photos(report_id,content,mimetype,filename,digest)
+                    VALUES (%s,%s,%s,%s,%s)""",(report['id'],content,mime,filename,digest))
+                created.append({'id':report['id'],'filename':filename,'status':'saved','data':p})
+                continue
             row=c.execute("""INSERT INTO worker_selection_auto_reviews(worker,filename,photo,mime,parsed,status)
                  VALUES (%s,%s,%s,%s,%s::jsonb,%s) RETURNING id""",
               (worker,filename,content,mime,json.dumps(p),status)).fetchone()
@@ -165,7 +190,7 @@ PAGE=r"""<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewpo
 <label>Observaciones</label><textarea name="notes" rows="2"></textarea><label>Fotos de cuaderno (máximo 8, JPG/PNG)</label><input type="file" name="photos" accept="image/jpeg,image/png" multiple><p><button class="btn" type="submit">Guardar registro y fotos</button></p><div id="save"></div></form></section>
 <section><h2>Reportes guardados</h2><div class="grid"><div><label>Filtrar trabajador</label><input id="workerFilter" placeholder="Todos"></div><div><label>Filtrar día</label><input id="dayFilter" type="date"></div></div><p id="totals"></p><div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Transporte</th><th>Pallets</th><th>Malo</th><th>Excremento</th><th>Pisadas</th><th>Grasa</th><th>Óxido</th><th>Plaga</th><th>Fotos</th></tr></thead><tbody id="rows"></tbody></table></div></section></main>
 <script>
-const csrf={{ csrf|tojson }};const autoForm=document.getElementById('autoForm');autoForm.onsubmit=async e=>{e.preventDefault();const status=document.getElementById('autoStatus');const btn=autoForm.querySelector('button');btn.disabled=true;status.textContent='Leyendo fotografías…';try{const r=await fetch('/api/seleccion-trabajadores/auto',{method:'POST',headers:{'X-CSRF-Token':csrf},body:new FormData(autoForm)});const data=await r.json();if(!r.ok)throw Error(data.error||'No se pudo leer');status.textContent=data.reports.length+' fotografías leídas. '+data.reports.filter(x=>x.status==='review').length+' necesitan revisión. No se alteró el Kardex.';autoForm.reset()}catch(err){status.textContent=err.message}finally{btn.disabled=false}};let all=[];const q=id=>document.getElementById(id);function el(tag,text){const n=document.createElement(tag);n.textContent=text??'';return n}
+const csrf={{ csrf|tojson }};const autoForm=document.getElementById('autoForm');autoForm.onsubmit=async e=>{e.preventDefault();const status=document.getElementById('autoStatus');const btn=autoForm.querySelector('button');btn.disabled=true;status.textContent='Leyendo fotografías…';try{const r=await fetch('/api/seleccion-trabajadores/auto',{method:'POST',headers:{'X-CSRF-Token':csrf},body:new FormData(autoForm)});const data=await r.json();if(!r.ok)throw Error(data.error||'No se pudo leer');status.textContent=data.reports.length+' fotografías leídas. '+data.reports.filter(x=>x.status==='saved').length+' guardadas y '+data.reports.filter(x=>x.status==='review').length+' pendientes de revisión. No se alteró el Kardex.';autoForm.reset()}catch(err){status.textContent=err.message}finally{btn.disabled=false}};let all=[];const q=id=>document.getElementById(id);function el(tag,text){const n=document.createElement(tag);n.textContent=text??'';return n}
 async function load(){const r=await fetch('/api/seleccion-trabajadores');if(!r.ok)throw Error('No se pudieron leer reportes');all=(await r.json()).reports;render()}
 function render(){let list=all.filter(x=>x.worker.toLowerCase().includes(q('workerFilter').value.toLowerCase())&&(!q('dayFilter').value||q('dayFilter').value===x.worked_on));q('rows').replaceChildren();let pallets=0,defects=0;for(const x of list){pallets+=x.pallets||0;defects+=Object.values(x.defects||{}).reduce((s,v)=>s+(v||0),0);const tr=el('tr');for(const v of [x.worked_on,x.worker,x.transport,x.pallets,x.malo,x.defects?.excremento,x.defects?.pisadas,x.defects?.grasa,x.defects?.oxido,x.defects?.plaga])tr.append(el('td',v==null?'—':v));const td=el('td');const btn=el('button',String(x.photos));btn.type='button';btn.onclick=async()=>{const p=await(await fetch('/api/seleccion-trabajadores/'+x.id+'/fotos')).json();td.replaceChildren();for(const f of p.photos){const a=el('a',f.filename);a.href='/api/seleccion-trabajadores/foto/'+f.id;a.target='_blank';a.className='photo';td.append(a)}};td.append(btn);tr.append(td);q('rows').append(tr)}q('totals').textContent=list.length+' reportes · '+pallets+' pallets · '+defects+' incidencias clasificadas (no incluye «malo» para evitar doble conteo)'}
 q('workerFilter').oninput=render;q('dayFilter').oninput=render;
