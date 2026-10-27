@@ -287,6 +287,27 @@ def mail_imports():
     return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Importaciones DreamHost</title><style>body{font:15px system-ui;margin:30px auto;max-width:1200px;padding:0 20px}table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}td{overflow-wrap:anywhere}</style><h1>Importaciones DreamHost</h1><p><a href="/">← Volver al Kardex</a> · Los registros con estado review requieren conciliación; no se sobrescribieron.</p><table><tr><th>Fecha</th><th>Archivo</th><th>Estado</th><th>Detalle</th></tr>'+tr+'</table></html>'
 
 
+
+def fix_karen_bad_oct20_once():
+    """Correct photographed handwritten Malo count, preserve independent color counts."""
+    with db() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS worker_selection_corrections (
+          report_id BIGINT NOT NULL, field_name TEXT NOT NULL,
+          old_value INTEGER NOT NULL,new_value INTEGER NOT NULL,
+          reason TEXT NOT NULL,changed_at TIMESTAMPTZ DEFAULT now(),
+          PRIMARY KEY(report_id,field_name))""")
+        row=c.execute("""SELECT id,malo FROM worker_selection_reports
+          WHERE id=6 AND worker='Karen' AND worked_on='2026-10-20'
+            AND upper(transport)='XIONFI' FOR UPDATE""").fetchone()
+        if not row:return
+        if row['malo']==555:return
+        if row['malo']!=5:raise RuntimeError('Registro cambiado: requiere revisión manual')
+        c.execute("""INSERT INTO worker_selection_corrections(report_id,field_name,old_value,new_value,reason)
+          VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING""",
+          (row['id'],'malo',5,555,'Corrección solicitada por usuario a partir de foto original 20/10/2026'))
+        c.execute("UPDATE worker_selection_reports SET malo=555 WHERE id=%s",(row['id'],))
+        c.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('FIX_WORKER_SELECTION_MALO','6'))
+fix_karen_bad_oct20_once()
 from worker_selection import bp_worker
 app.register_blueprint(bp_worker)
 
