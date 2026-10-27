@@ -308,6 +308,27 @@ def fix_karen_bad_oct20_once():
         c.execute("UPDATE worker_selection_reports SET malo=555 WHERE id=%s",(row['id'],))
         c.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('FIX_WORKER_SELECTION_MALO','6'))
 fix_karen_bad_oct20_once()
+
+def import_nicole_motta_oct_2026_once():
+    """Five transcribed handwritten sheets, preserving separate Merma and Rechazadas."""
+    rows=[["2026-10-17","DYR",59,{"sucio":25,"pisadas":25,"oxido":9},{"azul":50,"verde":1,"morado":3},"Registro manuscrito 17/10; cifras de encabezado no interpretadas"],["2026-10-17","PEPSICO",150,{"sucio":50,"pisadas":50,"oxido":30,"grasa":20},{"azul":24,"morado":20},"Registro manuscrito 17/10; cifra superior 500 no asignada a pallets"],["2026-10-17","SILVEIRA",300,{"grasa":50,"sucio":200,"pisadas":50},{"azul":100,"verde":10,"morado":20},"Registro manuscrito 17/10; cifra superior 1000 sin unidad"],["2026-10-19","SILVEIRA",570,{"sucio":270,"pisadas":100,"oxido":100,"grasa":100},{"azul":166,"verde":18,"morado":78},"Registro manuscrito 19/10; cifra superior 2500 sin unidad"],["2026-10-20","XIONFI",436,{"sucio":200,"pisadas":50,"oxido":50,"grasa":136},{"azul":151,"verde":18,"morado":83},"Registro manuscrito 20/10; transporte manuscrito CYONFI, cotejar grafía; cifra superior 2500 sin unidad"]]
+    with db() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS worker_selection_import_sources (
+          source_id TEXT PRIMARY KEY, imported_at TIMESTAMPTZ DEFAULT now(),
+          details JSONB NOT NULL)""")
+        source='nicole-motta-five-notebook-pages-oct-17-19-20-2026-v1'
+        if c.execute("SELECT 1 FROM worker_selection_import_sources WHERE source_id=%s",(source,)).fetchone():return
+        for i,(day,transport,malo,defects,colors,notes) in enumerate(rows):
+            if sum(defects.values())!=malo:raise RuntimeError('Merma inconsistente en hoja Nicole '+str(i))
+            c.execute("""INSERT INTO worker_selection_reports
+              (worker,worked_on,transport,pallets,malo,defects,selected_colors,notes)
+              VALUES (%s,%s,%s,NULL,%s,%s::jsonb,%s::jsonb,%s)""",
+              ('Nicole Motta',day,transport,malo,json.dumps(defects),json.dumps(colors),
+               notes+'; Fuente: ZIP cinco fotografías compartidas el 27/10/2026; imagen pendiente de adjuntar en app.'))
+        c.execute("INSERT INTO worker_selection_import_sources(source_id,details) VALUES (%s,%s::jsonb)",
+                  (source,json.dumps({'worker':'Nicole Motta','rows':rows,'count':5})))
+        c.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('IMPORT_NICOLE_SELECTION_5','worker_selection_reports'))
+import_nicole_motta_oct_2026_once()
 from worker_selection import bp_worker
 app.register_blueprint(bp_worker)
 
