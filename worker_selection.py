@@ -129,8 +129,15 @@ def automatic_upload():
             with urllib.request.urlopen(req,timeout=35) as response:
                 result=json.loads(response.read(150000))
             parsed=json.loads(result['choices'][0]['message']['content'])
-        except Exception:
-            return jsonify(error='No se pudo leer una de las fotos automáticamente. No se guardó información parcial.'),502
+        except urllib.error.HTTPError as err:
+            # Return a useful category without exposing credentials or provider payload.
+            status=err.code
+            reason={400:'Formato de solicitud rechazado por el proveedor de IA',401:'La clave de API no es válida o fue revocada',403:'La cuenta API no tiene permiso para usar el modelo',404:'El modelo de lectura de imágenes no está disponible',413:'La fotografía es demasiado grande para el proveedor',429:'La API no tiene saldo, alcanzó su cuota o su límite de solicitudes',500:'El proveedor de IA tuvo un error interno',502:'El proveedor de IA no respondió correctamente',503:'El proveedor de IA está temporalmente no disponible'}.get(status,'Error de comunicación con el proveedor de IA')
+            return jsonify(error=reason+' (código '+str(status)+'). No se guardaron datos parciales.'),502
+        except (urllib.error.URLError,TimeoutError):
+            return jsonify(error='No se logró conectar con la API de lectura. Revisa la conectividad del servidor.'),502
+        except (ValueError,KeyError,TypeError):
+            return jsonify(error='La IA respondió con un formato inesperado. No se guardaron datos parciales.'),502
         prepared.append((filename,content,mime,parsed))
     created=[]
     with db() as c:
