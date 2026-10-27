@@ -329,6 +329,13 @@ def import_nicole_motta_oct_2026_once():
                   (source,json.dumps({'worker':'Nicole Motta','rows':rows,'count':5})))
         c.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('IMPORT_NICOLE_SELECTION_5','worker_selection_reports'))
 import_nicole_motta_oct_2026_once()
+def correct_karen_date_once():
+    with db() as c:
+        row=c.execute("SELECT id,worked_on,malo,transport FROM worker_selection_reports WHERE id=5 FOR UPDATE").fetchone()
+        if row and str(row['worked_on'])=='2019-10-26' and row['malo']==360 and row['transport']=='DYR':
+            c.execute("INSERT INTO audit(operation,object_key) VALUES (%s,%s)",('FIX_KAREN_DATE_2019_TO_2026_10_19','worker_selection_reports:5'))
+            c.execute("UPDATE worker_selection_reports SET worked_on='2026-10-19' WHERE id=5")
+correct_karen_date_once()
 from worker_selection import bp_worker
 app.register_blueprint(bp_worker)
 
