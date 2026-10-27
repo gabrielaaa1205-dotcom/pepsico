@@ -56,7 +56,7 @@ def collection():
             if not photo.filename:continue
             data=photo.read(3*1024*1024+1)
             if len(data)>3*1024*1024:return jsonify(error='Máximo 3 MB por foto'),400
-            mime='image/jpeg' if data.startswith(b'\\xff\\xd8\\xff') else 'image/png' if data.startswith(b'\\x89PNG\\r\\n\\x1a\\n') else None
+            mime='image/jpeg' if data.startswith(b'\xff\xd8\xff') else 'image/png' if data.startswith(b'\x89PNG\r\n\x1a\n') else None
             if not mime:return jsonify(error='Solo fotos JPG o PNG'),400
             attachments.append((data,mime,photo.filename[:180],hashlib.sha256(data).hexdigest()))
     except (ValueError,KeyError) as e:return jsonify(error='Revisa las cantidades y la fecha'),400
