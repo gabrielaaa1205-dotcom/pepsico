@@ -68,5 +68,4 @@ def poll_on_health_check():
         threading.Thread(target=execute,name='cianse-mail-poll',daemon=True).start()
 
 # Recover missing email imports at application startup; advisory lock avoids duplicates.
-if os.getenv('APP_ENV') == 'production':
-    threading.Thread(target=execute,name='cianse-mail-startup',daemon=True).start()
+threading.Thread(target=execute,name='cianse-mail-startup',daemon=True).start()
