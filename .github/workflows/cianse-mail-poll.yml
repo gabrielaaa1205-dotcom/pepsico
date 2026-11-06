@@ -1,5 +1,8 @@
 name: CIANSE PepsiCo - comprobar correo cada 5 minutos
 on:
+  push:
+    paths:
+      - '.github/workflows/cianse-mail-poll.yml'
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
