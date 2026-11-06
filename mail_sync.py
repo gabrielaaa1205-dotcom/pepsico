@@ -8,9 +8,9 @@ from psycopg.rows import dict_row
 from mail_import import parse
 
 ALLOWED_FROM=os.getenv('MAIL_ALLOWED_SENDER','laura.guzman@cianse.net').strip().lower()
-MAIL_USER=os.environ['MAIL_USERNAME']
-MAIL_PASS=os.environ['MAIL_PASSWORD']
-DB=os.environ['DATABASE_URL']
+MAIL_USER=os.getenv('MAIL_USERNAME') or os.getenv('DREAMHOST_IMAP_USER','gabriela.diaz@cianse.com')
+MAIL_PASS=os.getenv('MAIL_PASSWORD') or os.getenv('DREAMHOST_IMAP_PASSWORD')
+DB=os.getenv('DATABASE_URL')
 HOST=os.getenv('MAIL_IMAP_HOST','imap.dreamhost.com')
 PORT=int(os.getenv('MAIL_IMAP_PORT','993'))
 
@@ -76,6 +76,8 @@ def ingest(connection,mailbox,uid,name,blob):
     return status+': '+str(n)+' nuevos'+(' / discrepancias para revisar' if issues else '')
 
 def run():
+    if not MAIL_PASS or not MAIL_USER or not DB:
+        raise RuntimeError('Falta configuración de correo o base de datos para sincronización')
     with psycopg.connect(DB,row_factory=dict_row,autocommit=True) as connection:
         tables(connection)
         with imaplib.IMAP4_SSL(HOST,PORT,ssl_context=ssl.create_default_context(),timeout=45) as imap:
@@ -83,7 +85,7 @@ def run():
             typ,_=imap.select('INBOX',readonly=True)
             if typ!='OK':raise RuntimeError('No se pudo seleccionar bandeja INBOX')
             # Only recent mail to bound workload; UID + digest protect against repeats.
-            since=(datetime.date.today()-datetime.timedelta(days=int(os.getenv('MAIL_LOOKBACK_DAYS','14')))).strftime('%d-%b-%Y')
+            since=(datetime.date.today()-datetime.timedelta(days=int(os.getenv('MAIL_LOOKBACK_DAYS','45')))).strftime('%d-%b-%Y')
             typ,items=imap.uid('SEARCH',None,'SINCE',since)
             if typ!='OK':raise RuntimeError('Error consultando mensajes')
             for uid in (items[0] or b'').split()[-200:]:
