@@ -1,0 +1,15 @@
+name: CIANSE PepsiCo - comprobar correo cada 5 minutos
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Wake CIANSE and request safe mail poll
+        run: |
+          curl --fail-with-body --silent --show-error --location --retry 3 --retry-delay 8 --max-time 110 https://pepsico-zo2e.onrender.com/health
