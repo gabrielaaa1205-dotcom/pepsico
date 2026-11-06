@@ -51,3 +51,18 @@ def sync_status():
         rows=c.execute('SELECT started_at,finished_at,status,details FROM mail_sync_runs ORDER BY id DESC LIMIT 5').fetchall()
         ing=c.execute('SELECT max(processed_at) latest,count(*) FILTER (WHERE status=%s) imported,count(*) FILTER (WHERE status=%s) review FROM mail_ingestions',('imported','review')).fetchone()
     return jsonify(runs=[dict(x,started_at=x['started_at'].isoformat(),finished_at=x['finished_at'].isoformat() if x['finished_at'] else None) for x in rows],ingestions=dict(ing,latest=ing['latest'].isoformat() if ing['latest'] else None))
+
+@bp_mail_bridge.before_app_request
+def poll_on_health_check():
+    """A scheduler may ping the public /health endpoint. No mailbox data is exposed."""
+    if request.path != '/health' or request.method != 'GET':return
+    with db() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS mail_sync_heartbeat (
+          name TEXT PRIMARY KEY, last_requested_at TIMESTAMPTZ NOT NULL)""")
+        started=c.execute("""INSERT INTO mail_sync_heartbeat(name,last_requested_at)
+          VALUES ('pepsico',now())
+          ON CONFLICT (name) DO UPDATE SET last_requested_at=EXCLUDED.last_requested_at
+          WHERE mail_sync_heartbeat.last_requested_at < now()-interval '4 minutes'
+          RETURNING name""").fetchone()
+    if started:
+        threading.Thread(target=execute,name='cianse-mail-poll',daemon=True).start()
