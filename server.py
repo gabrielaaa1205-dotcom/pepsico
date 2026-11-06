@@ -339,6 +339,9 @@ correct_karen_date_once()
 from worker_selection import bp_worker
 app.register_blueprint(bp_worker)
 
+from worker_daily_entry import bp_daily
+app.register_blueprint(bp_daily)
+
 from mail_bridge import bp_mail_bridge
 app.register_blueprint(bp_mail_bridge)
 
