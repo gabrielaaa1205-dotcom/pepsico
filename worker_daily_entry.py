@@ -76,6 +76,91 @@ def register_daily():
         registered_at=item['created_at'].astimezone(TZ).isoformat(),
         recorded_by=session.get('username','')),201
 
+
+@bp_daily.route('/api/seleccion-trabajadores/registrar-lote',methods=['POST'])
+def register_daily_batch():
+    """Save one daily submission with up to twelve independent transport lines atomically."""
+    require_user()
+    if session.get('role') not in ('operario','supervisor','admin'):abort(403)
+    check_csrf()
+    data=request.get_json(silent=True)
+    if not isinstance(data,dict):return jsonify(error='Datos inválidos'),400
+    first=str(data.get('first_name') or '').strip()
+    last=str(data.get('last_name') or '').strip()
+    if not first or not last or len(first)>100 or len(last)>100:
+        return jsonify(error='Indica nombre y apellido de la trabajadora'),400
+    try:
+        day=datetime.date.fromisoformat(str(data.get('worked_on') or ''))
+        if day>datetime.datetime.now(TZ).date() or day<datetime.date(2025,1,1):
+            return jsonify(error='Revisa la fecha del trabajo'),400
+    except ValueError:return jsonify(error='Fecha inválida'),400
+    lines=data.get('transports')
+    if not isinstance(lines,list) or not 1<=len(lines)<=12:
+        return jsonify(error='Ingresa entre 1 y 12 transportes'),400
+    token=str(data.get('request_id') or '').strip()
+    import uuid
+    try:
+        uuid.UUID(token)
+        if len(token)!=36:raise ValueError()
+    except (ValueError,TypeError,AttributeError):
+        return jsonify(error='Identificador de envío inválido'),400
+    prepared=[]
+    for idx,line in enumerate(lines,1):
+        if not isinstance(line,dict):return jsonify(error=f'Transporte {idx}: datos inválidos'),400
+        transport=str(line.get('transport') or '').strip()
+        if not transport or len(transport)>100:
+            return jsonify(error=f'Transporte {idx}: indica la empresa de transporte'),400
+        try:
+            if not isinstance(line.get('merma'),dict) or not isinstance(line.get('rejected'),dict):
+                raise ValueError('Categorías inválidas')
+            merma={k:integer(line['merma'].get(k)) or 0 for k in MERMA}
+            rejects={k:integer(line['rejected'].get(k)) or 0 for k in COLORS}
+            pallets=integer(line.get('pallets'))
+        except (ValueError,TypeError):
+            return jsonify(error=f'Transporte {idx}: revisa las cantidades'),400
+        if not any(merma.values()) and not any(rejects.values()):
+            return jsonify(error=f'Transporte {idx}: registra al menos una caja'),400
+        prepared.append((transport,pallets,merma,rejects,str(line.get('notes') or '').strip()[:600]))
+    full=' '.join((first+' '+last).split())
+    with db() as c:
+        ensure_columns(c)
+        c.execute("""CREATE TABLE IF NOT EXISTS worker_selection_batches(
+          request_id UUID PRIMARY KEY,
+          first_name TEXT NOT NULL,last_name TEXT NOT NULL,worked_on DATE NOT NULL,
+          creator BIGINT REFERENCES users(id),
+          report_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        # One submission / one database transaction: prevents partial saves.
+        batch=c.execute("""INSERT INTO worker_selection_batches(request_id,first_name,last_name,worked_on,creator)
+            VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING RETURNING created_at""",
+            (token,first,last,day,session['uid'])).fetchone()
+        if batch is None:
+            previous=c.execute("""SELECT creator,report_ids FROM worker_selection_batches
+              WHERE request_id=%s""",(token,)).fetchone()
+            if previous['creator']!=session['uid']:abort(409)
+            return jsonify(ok=True,duplicate=True,ids=previous['report_ids'],
+                message='Este envío ya estaba guardado. No se duplicaron transportes.'),200
+        ids=[]
+        for transport,pallets,merma,rejects,notes in prepared:
+            item=c.execute("""INSERT INTO worker_selection_reports(
+                worker,worker_first_name,worker_last_name,worked_on,transport,
+                pallets,malo,defects,selected_colors,notes,creator,entry_method)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s,'form')
+                RETURNING id""",
+                (full,first,last,day,transport,pallets,sum(merma.values()),
+                 json.dumps(merma),json.dumps(rejects),notes,session['uid'])).fetchone()
+            ids.append(item['id'])
+        c.execute("UPDATE worker_selection_batches SET report_ids=%s::jsonb WHERE request_id=%s",
+                  (json.dumps(ids),token))
+        c.execute("INSERT INTO audit(actor,operation,object_key) VALUES (%s,%s,%s)",
+                  (session['uid'],'CREATE_WORKER_SELECTION_BATCH',token))
+        created=batch['created_at']
+    return jsonify(ok=True,ids=ids,worker=full,transport_count=len(ids),
+        merma=sum(sum(x[2].values()) for x in prepared),
+        rejected=sum(sum(x[3].values()) for x in prepared),
+        recorded_by=session.get('username',''),
+        registered_at=created.astimezone(TZ).isoformat()),201
+
 @bp_daily.route('/api/seleccion-trabajadores/registro-reciente')
 def recent_entries():
     require_user()
